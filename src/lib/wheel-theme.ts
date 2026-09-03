@@ -1,5 +1,5 @@
 // Tema visual da roleta — fonte única de verdade para a roleta ao vivo
-// (RouletteScreen) e para as prévias do admin (RouletteWheelPreview / WheelConfig).
+// (RouletteScreen) e para a prévia do admin (RouletteWheelPreview).
 // Referência: imagem final aprovada da roleta.
 //
 // Regra: a roleta SEMPRE alterna magenta × lavanda, independente do token de cor
