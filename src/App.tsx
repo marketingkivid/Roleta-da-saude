@@ -39,8 +39,10 @@ const App = () => (
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/painel" element={<PublicPanel />} />
+            {/* /admin = painel público (só números, protegido por código) */}
+            <Route path="/admin" element={<PublicPanel />} />
+            {/* /gestao = backoffice real (login) — criar/editar campanhas, leads, exportação */}
+            <Route path="/gestao" element={<Admin />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/:slug" element={<Index />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
