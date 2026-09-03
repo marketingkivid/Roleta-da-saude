@@ -46,13 +46,9 @@ export function fitWheelLabel(
     if (lines) return { lines, fontSize: fs, lineHeight: fs * 1.1 };
   }
 
-  // Last resort — hard character-break at the smallest size.
+  // Last resort — nunca corta palavra no meio: uma palavra por linha no menor
+  // tamanho. Uma palavra longa pode transbordar levemente sobre a divisória da
+  // fatia (2px), o que é imperceptível e muito melhor do que texto ilegível.
   const fs = minFont;
-  const charW = fs * 0.58;
-  const maxChars = Math.max(2, Math.floor(arcWidth / charW));
-  const lines: string[] = [];
-  for (let i = 0; i < raw.length && lines.length < maxLines; i += maxChars) {
-    lines.push(raw.slice(i, i + maxChars));
-  }
-  return { lines, fontSize: fs, lineHeight: fs * 1.1 };
+  return { lines: [...words], fontSize: fs, lineHeight: fs * 1.1 };
 }

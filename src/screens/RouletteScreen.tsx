@@ -343,9 +343,10 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
   // Reserva vertical para header + progressbar + título + botão + paddings.
   // Assim o CTA fica visível sem rolar em telas pequenas.
   const isMobile = viewportW < 640;
-  // Reserva vertical maior no mobile para deixar o CTA + microcopy totalmente
-  // visíveis sem sobrar wheel colada no botão em iPhones pequenos.
-  const chromeReserve = isMobile ? 300 : 300;
+  // Reserva vertical p/ header + progressbar + título + ponteiro + CTA + microcopy.
+  // Cresce em telas curtas para o CTA ficar visível sem rolar e o ponteiro não
+  // encostar no título (iPhone SE / navegadores com barra grande).
+  const chromeReserve = viewportH < 720 ? 372 : viewportH < 820 ? 324 : 300;
   const sizeByHeight = Math.max(220, viewportH - chromeReserve);
   const size = Math.min(520, sizeByWidth, sizeByHeight);
 
