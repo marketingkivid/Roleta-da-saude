@@ -6,6 +6,7 @@ import RewardPreview from './RewardPreview';
 import ConsolationPreview from './ConsolationPreview';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { inputStyle, labelStyle, focusHandler, blurHandler } from '@/lib/admin-styles';
+import { Emoji } from '@/lib/twemoji';
 
 type Prize = Tables<'prizes'>;
 
@@ -142,7 +143,7 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
           </label>
           {form.is_consolation && existingConsolation && (
             <p style={{ fontSize: 13, color: '#E8357A', marginTop: 8, paddingLeft: 32 }}>
-              ⚠️ O prêmio "{existingConsolation.name}" será desmarcado como consolação
+              <Emoji emoji="⚠️" label="Atenção" /> O prêmio "{existingConsolation.name}" será desmarcado como consolação
             </p>
           )}
         </div>
@@ -199,12 +200,12 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
                   fontFamily: 'Nunito, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 6 }}>{form.emoji || '🎁'}</div>
+                <div style={{ lineHeight: 1, marginBottom: 6 }}><Emoji emoji={form.emoji || '🎁'} label="" size={36} /></div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                   {form.name || 'Nome do prêmio'}
                 </div>
                 <p style={{ fontSize: 11, color: '#9B8FAE', marginTop: 8 }}>
-                  A fatia mostrará o emoji e o nome. Textos longos serão abreviados com "…".
+                  A fatia mostrará o emoji e o nome. Textos longos quebram em várias linhas para caber (nunca são cortados).
                 </p>
               </div>
             )}

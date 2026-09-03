@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Download } from 'lucide-react';
+import { Emoji } from '@/lib/twemoji';
 
 interface Lead {
   id: string;
@@ -117,7 +118,7 @@ const LeadList = () => {
 
       {filtered.length === 0 ? (
         <div className="py-12 text-center" style={{ background: '#FFFFFF', borderRadius: 20, border: '0.5px solid #E8E0EE' }}>
-          <p style={{ fontSize: 32 }}>👥</p>
+          <p><Emoji emoji="👥" label="" size={32} /></p>
           <p style={{ fontSize: 16, fontWeight: 700, color: '#1A1A2E', marginTop: 8, fontFamily: 'Nunito, sans-serif' }}>Nenhum lead encontrado</p>
           <p style={{ fontSize: 16, color: '#5A5A7A', marginTop: 4, fontFamily: 'Nunito, sans-serif' }}>Os leads aparecerão aqui após as participações</p>
         </div>

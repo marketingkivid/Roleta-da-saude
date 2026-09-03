@@ -1,5 +1,7 @@
-import { SLICE_TOKENS } from './WheelConfig';
 import { fitWheelLabel } from '@/lib/wheel-label';
+import { WHEEL, sliceColor } from '@/lib/wheel-theme';
+import { twemojiUrl } from '@/lib/twemoji';
+import kividMark from '@/assets/kivid-mark.svg';
 
 
 export interface PreviewPrize {
@@ -19,21 +21,9 @@ interface Props {
   size?: number;
 }
 
-// Kivid — Pitaya sobre branco
-const PITAYA_600 = '#CF3A9D';
-const PITAYA_800 = '#A82F7F';
-const PITAYA_900 = '#942971';
-const WHITE = '#FFFFFF';
-const GOLD = PITAYA_600;       // aliases mantidos para reduzir mudanças
-const GOLD_DEEP = PITAYA_900;
-const PURPLE_DEEP = PITAYA_900;
-const CREAM = WHITE;
-const DEFAULT_COLORS = [PITAYA_600, PITAYA_800];
-
-const tokenToHex = (token: string | null, i: number) => {
-  const f = SLICE_TOKENS.find(t => t.token === token);
-  return f ? f.hex : DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-};
+const WHITE = WHEEL.divider;
+const RIM = WHEEL.rim;
+const RIM_EDGE = WHEEL.rimEdge;
 
 const polar = (cx: number, cy: number, r: number, a: number) => ({
   x: cx + r * Math.cos(a),
@@ -110,16 +100,18 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
   const sliceAngle = (Math.PI * 2) / n;
   let cursor = -Math.PI / 2;
 
+  const bulbCount = Math.max(12, n * 2);
+  const bulbs = Array.from({ length: bulbCount }).map((_, i) => {
+    const angle = (i / bulbCount) * Math.PI * 2 - Math.PI / 2;
+    return polar(cx, cy, r + 8, angle);
+  });
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <defs>
-        <radialGradient id="prevRim" cx="50%" cy="50%" r="50%">
-          <stop offset="90%" stopColor={GOLD} />
-          <stop offset="100%" stopColor={GOLD_DEEP} />
-        </radialGradient>
-      </defs>
-      <circle cx={cx} cy={cy} r={r + 12} fill="url(#prevRim)" />
-      <circle cx={cx} cy={cy} r={r + 4} fill={PURPLE_DEEP} />
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', overflow: 'visible' }}>
+      {/* Aro vinho — flat, igual à roleta ao vivo */}
+      <circle cx={cx} cy={cy} r={r + 13} fill={RIM_EDGE} />
+      <circle cx={cx} cy={cy} r={r + 11} fill={RIM} />
+      <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke={RIM_EDGE} strokeWidth={1.5} />
 
       {segments.map((seg, i) => {
         const start = cursor;
@@ -131,12 +123,13 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
         const path = `M ${cx} ${cy} L ${p0.x} ${p0.y} A ${r} ${r} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
         const mid = start + sliceAngle / 2;
         const lp = polar(cx, cy, r * 0.78, mid);
-        const color = tokenToHex(seg.color_token, seg.display_order ?? i);
+        const color = sliceColor(i);
         const arcAtLabel = (2 * Math.PI * (r * 0.78)) / n;
-        const arcWidth = Math.max(20, arcAtLabel * 0.9);
+        const arcWidth = Math.max(20, arcAtLabel * 0.92);
         const showImage = seg.show_image !== false;
         const hasImage = showImage && !!seg.image_url;
         const emoji = (seg.emoji || '').trim();
+        const emojiHref = emoji ? twemojiUrl(emoji) : null;
         const rawLabel = seg.is_consolation ? CONSOLATION_SLICE_LABEL : (seg.name || '');
         const midDeg = (mid * 180) / Math.PI;
         const clipId = `prev-clip-${i}`;
@@ -180,8 +173,8 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
                       dominantBaseline="central"
                       fontSize={fitted.fontSize}
                       fontWeight={800}
-                      fill={CREAM}
-                      stroke={PURPLE_DEEP}
+                      fill={WHEEL.labelFill}
+                      stroke={WHEEL.labelStroke}
                       strokeWidth={2}
                       strokeLinejoin="round"
                       paintOrder="stroke"
@@ -218,15 +211,20 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
             <path d={path} fill={color} stroke={WHITE} strokeWidth={1.5} />
             <g transform={`translate(${lp.x} ${lp.y}) rotate(${midDeg + 90})`}>
               {emoji && (
-                <text
-                  x={0}
-                  y={emojiY}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={iconR}
-                >
-                  {emoji}
-                </text>
+                emojiHref ? (
+                  <image
+                    href={emojiHref}
+                    x={-iconR / 2}
+                    y={emojiY - iconR / 2}
+                    width={iconR}
+                    height={iconR}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                ) : (
+                  <text x={0} y={emojiY} textAnchor="middle" dominantBaseline="central" fontSize={iconR}>
+                    {emoji}
+                  </text>
+                )
               )}
               {lineCount > 0 && (
                 <text
@@ -236,7 +234,11 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
                   dominantBaseline="central"
                   fontSize={textSize}
                   fontWeight={800}
-                  fill={CREAM}
+                  fill={WHEEL.labelFill}
+                  stroke={WHEEL.labelStroke}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
                   style={{ fontFamily: 'Nunito, sans-serif' }}
                 >
                   {fitted.lines.map((line, li) => (
@@ -251,16 +253,38 @@ const RouletteWheelPreview = ({ prizes, size = 300 }: Props) => {
         );
       })}
 
+      {/* Lâmpadas do aro — creme × magenta */}
+      {bulbs.map((b, i) => (
+        <circle
+          key={`b-${i}`}
+          cx={b.x}
+          cy={b.y}
+          r={3}
+          fill={i % 2 === 0 ? WHEEL.bulbCream : WHEEL.bulbMagenta}
+          stroke={RIM}
+          strokeWidth={0.6}
+        />
+      ))}
 
+      {/* Ponteiro — magenta com ponto branco */}
+      <polygon
+        points={`${cx - 9},${cy - r - 13} ${cx + 9},${cy - r - 13} ${cx},${cy - r + 6}`}
+        fill={WHEEL.pointer}
+        stroke={RIM}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <circle cx={cx} cy={cy - r - 8} r={2.5} fill={WHITE} />
 
-
-      {/* Pointer */}
-      <polygon points={`${cx - 8},2 ${cx + 8},2 ${cx},20`} fill={GOLD} stroke={GOLD_DEEP} strokeWidth={1.5} />
-
-      {/* Hub */}
-      <circle cx={cx} cy={cy} r={22} fill={GOLD} stroke={GOLD_DEEP} strokeWidth={1.5} />
-      <circle cx={cx} cy={cy} r={16} fill={PURPLE_DEEP} stroke={GOLD} strokeWidth={1} />
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={14} fill={GOLD} fontWeight={900}>★</text>
+      {/* Hub — marca Kivid */}
+      <image
+        href={kividMark}
+        x={cx - size * 0.12}
+        y={cy - size * 0.105}
+        width={size * 0.24}
+        height={size * 0.21}
+        preserveAspectRatio="xMidYMid meet"
+      />
     </svg>
   );
 };

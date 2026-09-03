@@ -10,6 +10,7 @@ import CampaignParticipantImport, { type ParsedRow } from './CampaignParticipant
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Emoji, EmojiText } from '@/lib/twemoji';
 import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -860,7 +861,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
             {step === 1 && (
               <div className="space-y-4">
                 <p style={{ ...FONT, fontSize: 13, color: '#9B8FAE' }}>
-                  Adicione quantos prêmios quiser 🎁. As probabilidades serão configuradas após salvar.
+                  <EmojiText>Adicione quantos prêmios quiser 🎁. As probabilidades serão configuradas após salvar.</EmojiText>
                 </p>
 
                 {/* Live wheel preview */}
@@ -961,12 +962,12 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                             <PrizeImageUpload imageUrl={p.image_url} onImageChange={(url) => updatePrize(idx, 'image_url', url)} />
                           ) : (
                             <div style={{ ...FONT, background: '#FAF7FC', border: '1.5px dashed #C7B8DA', borderRadius: 16, padding: 16, textAlign: 'center' }}>
-                              <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 6 }}>{p.emoji || '🎁'}</div>
+                              <div style={{ lineHeight: 1, marginBottom: 6 }}><Emoji emoji={p.emoji || '🎁'} label="" size={36} /></div>
                               <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                                 {p.name || 'Nome do prêmio'}
                               </div>
                               <p style={{ fontSize: 11, color: '#9B8FAE', marginTop: 8 }}>
-                                A fatia mostrará o emoji e o nome. Textos longos serão abreviados com "…".
+                                A fatia mostrará o emoji e o nome. Textos longos quebram em várias linhas para caber (nunca são cortados).
                               </p>
                             </div>
                           )}
@@ -1079,7 +1080,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
             {step === 2 && (
               <div className="space-y-6">
                 <div className="text-center" style={{ padding: '20px 0' }}>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>🚀</div>
+                  <div style={{ marginBottom: 16 }}><Emoji emoji="🚀" label="" size={48} /></div>
                   <h3 style={{ ...FONT, fontSize: 20, fontWeight: 700, color: '#1A1A2E', marginBottom: 8 }}>
                     Tudo pronto para salvar
                   </h3>

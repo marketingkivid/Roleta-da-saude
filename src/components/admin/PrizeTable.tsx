@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import PrizeForm from './PrizeForm';
+import { Emoji } from '@/lib/twemoji';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Prize = Tables<'prizes'>;
@@ -50,7 +51,7 @@ const PrizeTable = ({ prizes, onUpdate }: PrizeTableProps) => {
             fontFamily: 'Nunito, sans-serif',
           }}
         >
-          <span style={{ fontSize: 48, marginBottom: 12 }}>🎁</span>
+          <span style={{ marginBottom: 12 }}><Emoji emoji="🎁" label="" size={48} /></span>
           <p style={{ fontSize: 18, fontWeight: 700, color: '#1A1A2E', marginBottom: 4 }}>Nenhum prêmio cadastrado</p>
           <p style={{ fontSize: 14, color: '#9B8FAE', marginBottom: 20 }}>Crie seu primeiro prêmio para começar</p>
           <button

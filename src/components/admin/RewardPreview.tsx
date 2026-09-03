@@ -1,3 +1,5 @@
+import { Emoji } from '@/lib/twemoji';
+
 interface RewardPreviewProps {
   name: string;
   description: string;
@@ -24,11 +26,11 @@ const RewardPreview = ({ name, description, redeem_instructions, imageUrl, check
         {imageUrl ? (
           <img src={imageUrl} alt={name} style={{ width: 160, height: 160, objectFit: 'contain' }} />
         ) : (
-          <span style={{ fontSize: 64, color: '#9B8FAE' }}>📷</span>
+          <Emoji emoji="📷" label="" size={64} />
         )}
       </div>
 
-      <p style={{ marginTop: 20, fontSize: 24, fontWeight: 900 }}>🎉 Você ganhou!</p>
+      <p style={{ marginTop: 20, fontSize: 24, fontWeight: 900 }}><Emoji emoji="🎉" label="" /> Você ganhou!</p>
       <p style={{ fontSize: 28, fontWeight: 700, color: 'hsl(var(--secondary))', marginTop: 4 }}>
         {name || 'Nome do prêmio'}
       </p>
@@ -43,7 +45,7 @@ const RewardPreview = ({ name, description, redeem_instructions, imageUrl, check
           textAlign: 'left',
         }}
       >
-        <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Parabéns, Participante! 🥳</p>
+        <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Parabéns, Participante! <Emoji emoji="🥳" label="" /></p>
         <p style={{ fontSize: 16, color: 'hsl(var(--foreground) / 0.7)' }}>
           {description || 'Descrição do prêmio'}
         </p>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fitWheelLabel } from '@/lib/wheel-label';
 import { twemojiUrl, Emoji, EmojiText } from '@/lib/twemoji';
+import { WHEEL, sliceColor } from '@/lib/wheel-theme';
 import type { SpinResult } from '@/hooks/useCampaign';
 import kividMark from '@/assets/kivid-mark.svg';
 
@@ -44,17 +45,13 @@ const GOLD = PITAYA_600;
 const GOLD_DEEP = PITAYA_900;
 const BG_DARK = BG;
 
-// ── Roleta — design final Kivid (referência: imagem final da roleta) ──────────
-// A roleta ao vivo SEMPRE alterna lavanda × magenta (independente do token de
-// cor escolhido no admin), para bater exatamente com o design aprovado.
-const SLICE_MAGENTA = '#A72F86';   // fatia magenta
-const SLICE_LAVENDER = '#A98CDB';  // fatia lavanda (periwinkle)
-const RIM = '#6E1F3C';             // aro vinho escuro (flat, sem gradiente)
-const RIM_EDGE = '#8A2A50';        // linha do aro (levemente mais clara)
-const RIM_BULB_MAGENTA = '#C63C99';// lâmpada magenta do aro (alterna com creme)
-const POINTER = '#C0338F';         // ponteiro magenta
-
-const sliceColor = (i: number) => (i % 2 === 0 ? SLICE_MAGENTA : SLICE_LAVENDER);
+// ── Roleta — design final Kivid ──────────────────────────────────────────────
+// Paleta e regra de alternância vêm de src/lib/wheel-theme.ts (compartilhado
+// com as prévias do admin, para garantir fidelidade total).
+const RIM = WHEEL.rim;
+const RIM_EDGE = WHEEL.rimEdge;
+const RIM_BULB_MAGENTA = WHEEL.bulbMagenta;
+const POINTER = WHEEL.pointer;
 
 const polar = (cx: number, cy: number, r: number, angleRad: number) => ({
   x: cx + r * Math.cos(angleRad),

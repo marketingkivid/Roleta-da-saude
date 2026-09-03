@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Emoji } from '@/lib/twemoji';
 
 interface Participation {
   id: string;
@@ -38,7 +39,7 @@ const ParticipationList = () => {
   if (items.length === 0) {
     return (
       <div className="py-12 text-center" style={{ background: 'var(--kv-surface)', borderRadius: 16, border: '0.5px solid var(--kv-border)' }}>
-        <p style={{ fontSize: 32 }}>🎮</p>
+        <p><Emoji emoji="🎮" label="" size={32} /></p>
         <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--kv-text-dark)', marginTop: 8 }}>Nenhuma participação ainda</p>
         <p style={{ fontSize: 14, color: '#aaa', marginTop: 4 }}>As participações aparecerão aqui em tempo real</p>
       </div>

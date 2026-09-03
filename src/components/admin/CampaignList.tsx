@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Search, Pencil, Trash2, Link2, Zap, PauseCircle, ChevronLeft, ChevronRight, Copy, FileEdit, FlaskConical, Rocket } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Emoji } from '@/lib/twemoji';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -316,7 +317,7 @@ const CampaignList = ({ onEdit, onDuplicate }: CampaignListProps) => {
 
         {filtered.length === 0 ? (
           <div className="py-12 text-center" style={{ background: '#FFFFFF', borderRadius: 20, border: '0.5px solid #E8E0EE' }}>
-            <p style={{ fontSize: 32 }}>📢</p>
+            <p><Emoji emoji="📢" label="" size={32} /></p>
             <p style={{ fontSize: 16, fontWeight: 700, color: '#1A1A2E', marginTop: 8, ...FONT }}>
               {campaigns.length === 0 ? 'Nenhuma campanha criada' : 'Nenhuma campanha encontrada'}
             </p>

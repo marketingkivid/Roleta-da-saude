@@ -1,3 +1,5 @@
+import { Emoji } from '@/lib/twemoji';
+
 interface ConsolationPreviewProps {
   name: string;
   description: string;
@@ -20,11 +22,11 @@ const ConsolationPreview = ({ name, description, imageUrl }: ConsolationPreviewP
         {imageUrl ? (
           <img src={imageUrl} alt={name} style={{ width: 160, height: 160, objectFit: 'contain' }} />
         ) : (
-          <span style={{ fontSize: 64, color: '#9B8FAE' }}>📷</span>
+          <Emoji emoji="📷" label="" size={64} />
         )}
       </div>
 
-      <p style={{ marginTop: 20, fontSize: 24, fontWeight: 900 }}>😢 Não foi dessa vez…</p>
+      <p style={{ marginTop: 20, fontSize: 24, fontWeight: 900 }}><Emoji emoji="😢" label="" /> Não foi dessa vez…</p>
       <p style={{ fontSize: 28, fontWeight: 700, color: '#5A5A7A', marginTop: 4 }}>
         {name || 'Nome do prêmio'}
       </p>

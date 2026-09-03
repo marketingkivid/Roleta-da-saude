@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { digitsOnly, isValidBRMobile, toE164BR } from "@/lib/phone";
+import { EmojiText } from "@/lib/twemoji";
 
 const schema = z.object({
   first_name: z.string().trim().min(1, "Informe seu nome").max(80),
@@ -83,7 +84,7 @@ const Leads = () => {
 
         {done ? (
           <div className="space-y-4 text-center">
-            <p className="text-lg">Pronto! Já estamos com você 💜</p>
+            <p className="text-lg"><EmojiText>Pronto! Já estamos com você 💜</EmojiText></p>
             <Button variant="outline" onClick={() => setDone(false)}>Cadastrar outro</Button>
           </div>
         ) : (
