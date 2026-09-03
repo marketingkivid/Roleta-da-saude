@@ -33,7 +33,6 @@ npx supabase functions deploy spin-roulette
 npx supabase functions deploy sync-lead-brevo
 npx supabase functions deploy fix-brevo-errors
 npx supabase functions deploy create-admin-user
-npx supabase functions deploy public-dashboard
 ```
 
 ## 4. Secrets das edge functions
@@ -43,21 +42,20 @@ Em **Supabase → Project Settings → Edge Functions → Secrets** (ou
 
 | Secret | Para que serve | De onde vem |
 |---|---|---|
-| `PANEL_ACCESS_CODE` | código do painel "só resultados" em /admin | você inventa (forte) |
 | `BREVO_API_KEY` | sincronizar leads com o Brevo | sua conta Brevo → SMTP & API |
 | `BREVO_LIST_ID` | lista do Brevo que recebe os leads | Brevo → Contacts → Lists |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados automaticamente
 pelo Supabase — não precisa configurar.
 
-## 5. Criar o usuário admin
+## 5. Criar os usuários admin (login para toda a equipe)
 
-O app checa `has_role(uid, 'admin')`. Depois de criar seu usuário no
-Authentication do Supabase, insira o papel:
+O app checa `has_role(uid, 'admin')`. Para cada pessoa da equipe: criar o
+usuário no **Authentication** do Supabase e inserir o papel:
 
 ```sql
 insert into public.user_roles (user_id, role)
-values ('<uuid-do-seu-usuario>', 'admin');
+values ('<uuid-do-usuario>', 'admin');
 ```
 
 (ou use a função `create-admin-user` se ela cobrir isso — conferir o código dela)
@@ -88,8 +86,8 @@ O projeto novo começa vazio. As campanhas precisam ser recriadas em `/admin`
 
 - [ ] `supabase login` + `link`
 - [ ] `supabase db push`
-- [ ] deploy das 5 edge functions
-- [ ] secrets: `PANEL_ACCESS_CODE`, `BREVO_API_KEY`, `BREVO_LIST_ID`
-- [ ] usuário admin + linha em `user_roles`
+- [ ] deploy das 4 edge functions
+- [ ] secrets: `BREVO_API_KEY`, `BREVO_LIST_ID`
+- [ ] usuários admin (equipe) + linha em `user_roles` para cada um
 - [ ] me mandar a anon key → atualizo o `.env`
 - [ ] recriar campanhas
