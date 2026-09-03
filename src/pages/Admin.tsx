@@ -9,6 +9,7 @@ import { FONT } from '@/lib/admin-styles';
 const AdminDashboard = lazy(() => import('@/components/admin/AdminDashboard'));
 const CampaignList = lazy(() => import('@/components/admin/CampaignList'));
 const CampaignModal = lazy(() => import('@/components/admin/CampaignModal'));
+const PublicPanel = lazy(() => import('@/pages/PublicPanel'));
 
 type AdminTab = 'dashboard' | 'campaigns';
 
@@ -35,6 +36,8 @@ const Admin = () => {
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [campaignListKey, setCampaignListKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Time interno: ver só o painel de resultados (código, sem login, sem dados pessoais).
+  const [resultsOnly, setResultsOnly] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -155,6 +158,13 @@ const Admin = () => {
   }
 
   if (!isAuthenticated || !isAdmin) {
+    if (resultsOnly) {
+      return (
+        <Suspense fallback={<div className="min-h-screen" style={{ background: '#f8f9f9' }} />}>
+          <PublicPanel embedded onExit={() => setResultsOnly(false)} />
+        </Suspense>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#f8f9f9', ...FONT }}>
         <div className="w-full max-w-sm">
@@ -183,6 +193,18 @@ const Admin = () => {
                 Entrar
               </button>
             </form>
+            <div style={{ borderTop: '1px solid #E8E0EE', paddingTop: 16, textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setResultsOnly(true)}
+                style={{ background: 'none', border: 'none', color: '#5A5A7A', fontSize: 13, cursor: 'pointer', ...FONT }}
+              >
+                Sou do time e quero ver só os resultados →
+              </button>
+              <p style={{ fontSize: 11, color: '#9B8FAE', marginTop: 4, ...FONT }}>
+                Números agregados, sem dados pessoais. Precisa do código de acesso.
+              </p>
+            </div>
           </div>
         </div>
       </div>

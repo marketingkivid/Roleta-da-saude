@@ -8,7 +8,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
 const Leads = lazy(() => import("./pages/Leads.tsx"));
-const PublicPanel = lazy(() => import("./pages/PublicPanel.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
@@ -39,10 +38,7 @@ const App = () => (
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<Index />} />
-            {/* /admin = painel público (só números, protegido por código) */}
-            <Route path="/admin" element={<PublicPanel />} />
-            {/* /gestao = backoffice real (login) — criar/editar campanhas, leads, exportação */}
-            <Route path="/gestao" element={<Admin />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/:slug" element={<Index />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

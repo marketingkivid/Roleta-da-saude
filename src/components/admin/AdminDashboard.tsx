@@ -13,6 +13,8 @@ interface DailyAccess { date: string; count: number }
 interface HourlyAccess { hour: string; count: number }
 interface Sorteado { name: string; email: string; whatsapp: string; prize: string; date: string; uniqueToken?: string; link?: string }
 
+interface PrizeDist { prize: string; consolation: boolean; count: number }
+
 interface DashboardData {
   revenue: number; revenueChange: string;
   leads: number; leadsChange: string;
@@ -21,6 +23,7 @@ interface DashboardData {
   dailyAccess: DailyAccess[];
   hourlyAccess: HourlyAccess[];
   sorteados: Sorteado[];
+  distribution: PrizeDist[];
 }
 
 /* ── Helpers ────────────────────────────────────────── */
@@ -102,6 +105,7 @@ const AdminDashboard = () => {
     dailyAccess: [],
     hourlyAccess: [],
     sorteados: [],
+    distribution: [],
   });
 
   // Fetch campaigns with participant counts
@@ -137,8 +141,12 @@ const AdminDashboard = () => {
         let leadsQ = supabase.from('campaign_participants').select('*', { count: 'exact', head: true });
         if (cf) leadsQ = leadsQ.eq('campaign_id', selectedCampaign);
 
-        let prizesQ = supabase.from('prizes').select('id, name, checkout_url, campaign_id');
+        let prizesQ = supabase.from('prizes').select('id, name, checkout_url, campaign_id, is_consolation');
         if (cf) prizesQ = prizesQ.eq('campaign_id', selectedCampaign);
+
+        // Distribuição de prêmios — todas as participações (sem filtro de data).
+        let distQ = supabase.from('participations').select('prize_id');
+        if (cf) distQ = distQ.eq('campaign_id', selectedCampaign);
 
         let accessQ = supabase.from('participations').select('played_at').order('played_at', { ascending: true });
         if (sinceISO) accessQ = accessQ.gte('played_at', sinceISO);
@@ -180,17 +188,27 @@ const AdminDashboard = () => {
         const [
           leadsRes, prizesRes, accessRes, hourlyRes, sorteadosRes,
           totalRes, discountRes, allCampaignsRes,
-          curLeadsPeriodRes, prevLeadsRes, prevPlaysRes,
+          curLeadsPeriodRes, prevLeadsRes, prevPlaysRes, distRes,
         ] = await Promise.all([
           leadsQ, prizesQ, accessQ, hourlyQ, sorteadosQ,
           totalQ, discountQ, allCampaignsQ,
-          curLeadsPeriodQ, prevLeadsQ, prevPlaysQ,
+          curLeadsPeriodQ, prevLeadsQ, prevPlaysQ, distQ,
         ]);
 
         const leads = leadsRes.count || 0;
         const allPrizes = prizesRes.data || [];
         const prizeIds = allPrizes.filter(p => p.checkout_url).map(p => p.id);
         const prizeMap = Object.fromEntries(allPrizes.map(p => [p.id, p.name]));
+        const consolationSet = new Set(allPrizes.filter(p => (p as { is_consolation?: boolean }).is_consolation).map(p => p.id));
+
+        // Distribuição de prêmios (contagem por prêmio).
+        const distCount: Record<string, number> = {};
+        ((distRes.data as { prize_id: string }[] | null) || []).forEach(r => {
+          distCount[r.prize_id] = (distCount[r.prize_id] || 0) + 1;
+        });
+        const distribution: PrizeDist[] = Object.entries(distCount)
+          .map(([id, count]) => ({ prize: prizeMap[id] || '—', consolation: consolationSet.has(id), count }))
+          .sort((a, b) => b.count - a.count);
 
         // ── BATCH 2: Checkout count (depends on prizeIds) + token lookup ──
         const sorteadosRows = sorteadosRes.data || [];
@@ -290,7 +308,7 @@ const AdminDashboard = () => {
           leads, leadsChange,
           checkouts, checkoutsChange: playsChange,
           conversionRate, conversionChange,
-          dailyAccess, hourlyAccess, sorteados,
+          dailyAccess, hourlyAccess, sorteados, distribution,
         });
       } catch (err) {
         console.error('Dashboard fetch error:', err);
@@ -473,6 +491,35 @@ const AdminDashboard = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── BLOCO 2.75 — Prêmios distribuídos ────────── */}
+      {loading ? <SkeletonChart height={160} /> : (
+        <div style={CARD}>
+          <h3 style={{ ...FONT, fontSize: 16, fontWeight: 700, color: '#1A1A2E', marginBottom: 16 }}>Prêmios distribuídos</h3>
+          {data.distribution.length === 0 ? (
+            <p style={{ ...FONT, fontSize: 14, color: '#9B8FAE', padding: '16px 0', textAlign: 'center' }}>
+              Nenhuma participação ainda.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {data.distribution.map((d, i) => {
+                const max = Math.max(1, ...data.distribution.map(x => x.count));
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between items-baseline" style={{ marginBottom: 4 }}>
+                      <span style={{ ...FONT, fontSize: 13, fontWeight: 700, color: d.consolation ? '#9B8FAE' : '#1A1A2E' }}>{d.prize}</span>
+                      <span style={{ ...FONT, fontSize: 13, color: '#5A5A7A' }}>{fmt(d.count)}</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 99, background: '#F2F7F7' }}>
+                      <div style={{ height: '100%', borderRadius: 99, width: `${(d.count / max) * 100}%`, background: d.consolation ? '#C9D4D4' : '#E8357A', transition: 'width 0.4s ease' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

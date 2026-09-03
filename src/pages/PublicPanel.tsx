@@ -40,7 +40,14 @@ const Badge = ({ value }: { value: string }) => {
 
 const chartTooltip = { borderRadius: 20, border: '0.5px solid #E8E0EE', background: '#FFF', fontSize: 13, ...FONT };
 
-const PublicPanel = () => {
+interface PublicPanelProps {
+  /** Renderizado dentro da tela de /admin (não é rota própria). */
+  embedded?: boolean;
+  /** "Sair" volta para o login do admin. */
+  onExit?: () => void;
+}
+
+const PublicPanel = ({ embedded = false, onExit }: PublicPanelProps) => {
   const isMobile = useIsMobile();
   const [code, setCode] = useState<string>(() => {
     try { return sessionStorage.getItem(CODE_KEY) || ''; } catch { return ''; }
@@ -130,6 +137,15 @@ const PublicPanel = () => {
           <p style={{ fontSize: 12, color: '#9B8FAE', textAlign: 'center', lineHeight: 1.5 }}>
             Somente números agregados. Nenhum dado pessoal de participantes é exibido aqui.
           </p>
+          {embedded && onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              style={{ background: 'none', border: 'none', color: '#E8357A', fontSize: 13, cursor: 'pointer', width: '100%', ...FONT }}
+            >
+              ← Entrar como administrador
+            </button>
+          )}
         </form>
       </main>
     );
@@ -153,7 +169,11 @@ const PublicPanel = () => {
             <span style={{ fontSize: 13, color: '#9B8FAE' }}>Painel de resultados</span>
           </div>
           <button
-            onClick={() => { setAuthed(false); setCode(''); setCodeInput(''); try { sessionStorage.removeItem(CODE_KEY); } catch { /* noop */ } }}
+            onClick={() => {
+              setAuthed(false); setCode(''); setCodeInput('');
+              try { sessionStorage.removeItem(CODE_KEY); } catch { /* noop */ }
+              onExit?.();
+            }}
             style={{ background: 'none', border: 'none', color: '#9B8FAE', fontSize: 13, cursor: 'pointer', ...FONT }}
           >
             Sair
