@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { X, Plus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download } from 'lucide-react';
+import { X, Plus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download, FlaskConical } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import PrizeImageUpload from './PrizeImageUpload';
@@ -723,47 +723,53 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                   <input value={form.campaign_type} onChange={e => update('campaign_type', e.target.value)} placeholder="Ex: GAMIFICACAO, CUPOM, SORTEIO" style={inputStyle} onFocus={focusHandler} onBlur={blurHandler} />
                 </div>
 
-                {/* Campanha de teste — permite acesso repetido (ignora bloqueio local de "já girou") */}
+                {/* Campanha de teste — em destaque: cria e testa sem consumir
+                    links reais nem entrar nos números das campanhas oficiais. */}
                 <div
                   style={{
-                    background: '#FAF7FC',
-                    border: '1px solid #E8E0EE',
-                    borderRadius: 12,
-                    padding: '12px 16px',
+                    background: form.is_test ? '#FEF6E7' : '#FFFBF2',
+                    border: `1.5px dashed ${form.is_test ? '#E0A63A' : '#F0D9A8'}`,
+                    borderRadius: 16,
+                    padding: '16px 18px',
                     ...FONT,
                   }}
                 >
-                  <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <label className="flex items-start justify-between gap-3 cursor-pointer">
                     <div className="flex-1 min-w-0">
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>
+                      <div className="flex items-center gap-2" style={{ fontSize: 15, fontWeight: 800, color: '#8A5A12' }}>
+                        <FlaskConical size={16} />
                         Campanha de teste
                       </div>
-                      <div style={{ fontSize: 12, color: '#9B8FAE', marginTop: 2 }}>
-                        Permite repetir o acesso na mesma sessão (ignora o bloqueio de "já girou"). Use apenas para testes.
+                      <div style={{ fontSize: 13, color: '#9A7B3E', marginTop: 4, lineHeight: 1.45 }}>
+                        Crie e teste a roleta à vontade — <strong>sem gastar links reais</strong> e sem misturar
+                        com os números das campanhas oficiais. O acesso pode ser repetido quantas vezes quiser
+                        (o formulário e o giro reiniciam a cada visita).
                       </div>
                     </div>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={form.is_test}
+                      aria-label="Campanha de teste"
                       onClick={() => update('is_test', !form.is_test)}
                       className="transition-all"
                       style={{
                         position: 'relative',
-                        width: 44,
-                        height: 24,
+                        width: 46,
+                        height: 26,
                         borderRadius: 999,
-                        background: form.is_test ? '#E8357A' : '#E8E0EE',
+                        background: form.is_test ? '#E0A63A' : '#E8E0EE',
                         border: 'none',
                         cursor: 'pointer',
                         flexShrink: 0,
+                        marginTop: 2,
                       }}
                     >
                       <span
                         style={{
                           position: 'absolute',
-                          top: 2,
-                          left: form.is_test ? 22 : 2,
+                          top: 3,
+                          left: form.is_test ? 23 : 3,
                           width: 20,
                           height: 20,
                           borderRadius: '50%',

@@ -23,6 +23,18 @@ export function getSinceDate(period: Period): Date | null {
   return null;
 }
 
+/**
+ * Janela do período anterior, para comparação "vs. período anterior" nos KPIs.
+ * Retorna [início, fim) do período imediatamente antes do atual.
+ * `null` quando o período é "todo o período" (não há comparação).
+ */
+export function getPreviousRange(period: Period): { from: Date; to: Date } | null {
+  const since = getSinceDate(period);
+  if (!since) return null;
+  const spanMs = Date.now() - since.getTime();
+  return { from: new Date(since.getTime() - spanMs), to: since };
+}
+
 interface PeriodFilterProps {
   value: Period;
   onChange: (period: Period) => void;

@@ -5,7 +5,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Zap, PauseCircle, Download } from 'lucide-react';
-import PeriodFilter, { type Period, getSinceDate } from './PeriodFilter';
+import PeriodFilter, { type Period, getSinceDate, getPreviousRange } from './PeriodFilter';
 import { FONT, CARD } from '@/lib/admin-styles';
 
 /* ── Types ──────────────────────────────────────────── */
@@ -27,6 +27,15 @@ interface DashboardData {
 const fmt = (n: number) => n.toLocaleString('pt-BR');
 const fmtBRL = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const BASE_PRICE = 14.90;
+
+/** Variação percentual entre período atual e anterior, formatada para o badge. */
+const pctChange = (current: number, previous: number): string => {
+  if (previous <= 0) return current > 0 ? '+100%' : '—';
+  const delta = ((current - previous) / previous) * 100;
+  if (Math.abs(delta) < 0.5) return '—';
+  const rounded = Math.round(delta);
+  return `${rounded > 0 ? '+' : ''}${rounded}%`;
+};
 
 const VariationBadge = ({ value }: { value: string }) => {
   if (value === '—') return <span style={{ ...FONT, fontSize: 11, color: '#9B8FAE' }}>—</span>;
@@ -119,6 +128,9 @@ const AdminDashboard = () => {
       const cf = selectedCampaign !== 'all';
       const since = getSinceDate(activePeriod);
       const sinceISO = since ? since.toISOString() : null;
+      const prevRange = getPreviousRange(activePeriod);
+      const prevFromISO = prevRange ? prevRange.from.toISOString() : null;
+      const prevToISO = prevRange ? prevRange.to.toISOString() : null;
 
       try {
         // ── BATCH 1: All independent queries in parallel ──
@@ -148,12 +160,31 @@ const AdminDashboard = () => {
 
         const allCampaignsQ = supabase.from('campaigns').select('id, slug');
 
+        // Comparação "vs. período anterior" (badges de variação dos KPIs).
+        let curLeadsPeriodQ = supabase.from('campaign_participants').select('*', { count: 'exact', head: true });
+        if (cf) curLeadsPeriodQ = curLeadsPeriodQ.eq('campaign_id', selectedCampaign);
+        if (sinceISO) curLeadsPeriodQ = curLeadsPeriodQ.gte('created_at', sinceISO);
+
+        let prevLeadsBuilder = supabase.from('campaign_participants').select('*', { count: 'exact', head: true });
+        if (cf) prevLeadsBuilder = prevLeadsBuilder.eq('campaign_id', selectedCampaign);
+        const prevLeadsQ: PromiseLike<{ count: number | null }> = prevFromISO
+          ? prevLeadsBuilder.gte('created_at', prevFromISO).lt('created_at', prevToISO!)
+          : Promise.resolve({ count: null });
+
+        let prevPlaysBuilder = supabase.from('participations').select('*', { count: 'exact', head: true });
+        if (cf) prevPlaysBuilder = prevPlaysBuilder.eq('campaign_id', selectedCampaign);
+        const prevPlaysQ: PromiseLike<{ count: number | null }> = prevFromISO
+          ? prevPlaysBuilder.gte('played_at', prevFromISO).lt('played_at', prevToISO!)
+          : Promise.resolve({ count: null });
+
         const [
           leadsRes, prizesRes, accessRes, hourlyRes, sorteadosRes,
           totalRes, discountRes, allCampaignsRes,
+          curLeadsPeriodRes, prevLeadsRes, prevPlaysRes,
         ] = await Promise.all([
           leadsQ, prizesQ, accessQ, hourlyQ, sorteadosQ,
           totalQ, discountQ, allCampaignsQ,
+          curLeadsPeriodQ, prevLeadsQ, prevPlaysQ,
         ]);
 
         const leads = leadsRes.count || 0;
@@ -194,6 +225,20 @@ const AdminDashboard = () => {
         const checkouts = checkoutsCount || totalParticipations;
         const revenue = checkouts * unitPrice;
         const conversionRate = leads > 0 ? Math.round((checkouts / leads) * 1000) / 10 : 0;
+
+        // ── Variação vs. período anterior ──
+        const curPlays = (accessRes.data || []).length;
+        const prevPlays = prevPlaysRes.count;
+        const curLeadsPeriod = curLeadsPeriodRes.count || 0;
+        const prevLeadsPeriod = prevLeadsRes.count;
+        const hasPrev = prevRange !== null;
+        const leadsChange = hasPrev ? pctChange(curLeadsPeriod, prevLeadsPeriod ?? 0) : '—';
+        // Receita e checkouts acompanham o volume de giros do período.
+        const playsChange = hasPrev ? pctChange(curPlays, prevPlays ?? 0) : '—';
+        // Conversão: giros por lead — sobe se mais gente que se cadastra também gira.
+        const curConv = curLeadsPeriod > 0 ? curPlays / curLeadsPeriod : 0;
+        const prevConv = (prevLeadsPeriod ?? 0) > 0 ? (prevPlays ?? 0) / (prevLeadsPeriod ?? 1) : 0;
+        const conversionChange = hasPrev ? pctChange(Math.round(curConv * 1000), Math.round(prevConv * 1000)) : '—';
 
         // Daily access
         const dailyMap: Record<string, number> = {};
@@ -241,10 +286,10 @@ const AdminDashboard = () => {
         });
 
         setData({
-          revenue, revenueChange: '—',
-          leads, leadsChange: '—',
-          checkouts, checkoutsChange: '—',
-          conversionRate, conversionChange: '—',
+          revenue, revenueChange: playsChange,
+          leads, leadsChange,
+          checkouts, checkoutsChange: playsChange,
+          conversionRate, conversionChange,
           dailyAccess, hourlyAccess, sorteados,
         });
       } catch (err) {
