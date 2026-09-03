@@ -23,8 +23,8 @@ const CONSOLATION_WHEEL_LABEL = 'Não foi dessa vez';
 interface RouletteScreenProps {
   campaignId: string;
   onSpin: () => Promise<SpinResult | null>;
+  /** Chamado quando o modal de resultado é dispensado (botão, ×, ESC ou backdrop). */
   onFinish: (result: SpinResult) => Promise<void>;
-  onClose: () => void;
 }
 
 // Kivid DS — família Pitaya sobre branco Kivid
@@ -101,7 +101,7 @@ const CoinRain = () => {
   );
 };
 
-const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScreenProps) => {
+const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) => {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [rotation, setRotation] = useState(0);
@@ -515,7 +515,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        void handleContinue();
         return;
       }
       if (e.key === 'Tab') {
@@ -1009,8 +1009,8 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
           className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 animate-reveal-backdrop overflow-y-auto"
           style={{ background: 'rgba(94, 15, 63, 0.85)' }}
           onClick={(e) => {
-            // Fechar o modal (backdrop) → tela "já participou"
-            if (e.target === e.currentTarget) onClose();
+            // Fechar pelo backdrop → segue para a tela de resultado.
+            if (e.target === e.currentTarget) void handleContinue();
           }}
         >
           <div
@@ -1035,7 +1035,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             <button
               ref={closeBtnRef}
               type="button"
-              onClick={() => onClose()}
+              onClick={() => void handleContinue()}
               aria-label="Fechar"
               className="kv-btn"
               style={{
@@ -1099,7 +1099,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
 
             {revealPrize.is_consolation ? (
               <p id="kv-reveal-desc" className="text-[15px] sm:text-sm" style={{ color: '#6B4B7A', marginBottom: 20, lineHeight: 1.45 }}>
-                <EmojiText>Cada link da roleta vale um giro — esse foi o seu. 🎯 Mas a Kivid vive lançando roleta nova, sempre com prêmios diferentes. Enquanto a próxima não chega, dá uma olhada nas ofertas de agora. 💜</EmojiText>
+                <EmojiText>Não foi dessa vez — mas cada giro conta. Veja o que a gente preparou pra você. 💜</EmojiText>
               </p>
             ) : (
               revealPrize.description ? (
@@ -1112,53 +1112,28 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             )}
 
 
-            {revealPrize.is_consolation ? (
-              <a
-                href="https://kivid.com.br/simulador"
-                rel="noopener"
-                className="kv-btn kv-btn-continue w-full inline-flex items-center justify-center"
-                style={{
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '20px 24px',
-                  fontSize: 17,
-                  fontWeight: 900,
-                  letterSpacing: 0.5,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  minHeight: 60,
-                  textDecoration: 'none',
-                }}
-              >
-                Ver mais ofertas →
-              </a>
-
-
-
-            ) : (
-              <button
-                type="button"
-                onClick={handleContinue}
-                className="kv-btn kv-btn-continue w-full"
-                style={{
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '20px 24px',
-                  fontSize: 17,
-                  fontWeight: 900,
-                  letterSpacing: 0.5,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  minHeight: 60,
-                }}
-              >
-                Resgatar meu prêmio →
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="kv-btn kv-btn-continue w-full"
+              style={{
+                border: 'none',
+                borderRadius: 999,
+                padding: '20px 24px',
+                fontSize: 17,
+                fontWeight: 900,
+                letterSpacing: 0.5,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                minHeight: 60,
+              }}
+            >
+              {revealPrize.is_consolation ? 'Continuar →' : 'Pegar meu prêmio →'}
+            </button>
             <p className="text-[13px]" style={{ color: '#8A6BA0', marginTop: 10 }}>
               {revealPrize.is_consolation
                 ? <EmojiText>A próxima roleta pode ter o prêmio que você quer. ✨</EmojiText>
-                : 'Só falta 1 passo para receber.'}
+                : 'Falta só um passo para resgatar.'}
             </p>
           </div>
         </div>

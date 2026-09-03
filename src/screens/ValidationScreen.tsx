@@ -13,7 +13,6 @@ interface ValidationScreenProps {
   hasParticipantList?: boolean;
   validationError?: string;
   prefillData?: { name: string; email: string; phone: string };
-  postWin?: boolean;
 }
 
 const ValidationScreen = ({
@@ -25,7 +24,6 @@ const ValidationScreen = ({
   hasParticipantList = false,
   validationError,
   prefillData,
-  postWin = false,
 }: ValidationScreenProps) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -66,11 +64,9 @@ const ValidationScreen = ({
     setLoading(false);
   };
 
-  const bubbleMessage = postWin
-    ? 'Falta pouco! Preencha seus dados para receber o prêmio 🎁'
-    : hasParticipantList
-      ? 'Confirme seus dados para participar 😄'
-      : 'Oi! Antes de girar, vamos confirmar que é você 😄';
+  const bubbleMessage = hasParticipantList
+    ? 'Confirme seus dados e já já você gira a roleta 😄'
+    : 'Oi! Deixa teus dados e já já você gira a roleta 😄';
 
   // Simple pt-BR phone mask: (00) 00000-0000
   const formatPhone = (v: string) => {
@@ -197,7 +193,7 @@ const ValidationScreen = ({
 
         <Button variant="hero" size="lg" type="submit" className="mt-2 sm:mt-3 min-h-12 sm:min-h-16 py-3 sm:py-5 whitespace-normal leading-tight scroll-mb-6" disabled={loading} aria-busy={loading}>
           {loading ? <Loader2 className="animate-spin mr-2 h-5 w-5" aria-hidden="true" /> : null}
-          {loading ? 'Verificando...' : 'Tá bom, vamos lá! →'}
+          {loading ? 'Só um instante…' : 'Bora girar a roleta! →'}
         </Button>
 
         {serverError && (

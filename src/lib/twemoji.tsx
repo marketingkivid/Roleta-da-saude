@@ -89,7 +89,7 @@ function escapeHtml(s: string): string {
 }
 
 interface EmojiTextProps {
-  children: string;
+  children: string | string[];
   className?: string;
   /** Tamanho dos emojis. Padrão "1.1em" (levemente maior que o texto). */
   emojiSize?: number | string;
@@ -103,7 +103,7 @@ interface EmojiTextProps {
 export function EmojiText({ children, className, emojiSize = '1.1em', as = 'span' }: EmojiTextProps) {
   const Tag = as;
   const dim = typeof emojiSize === 'number' ? `${emojiSize}px` : emojiSize;
-  const text = children ?? '';
+  const text = Array.isArray(children) ? children.join('') : (children ?? '');
   const parts: ReactNode[] = [];
   let last = 0;
   let key = 0;

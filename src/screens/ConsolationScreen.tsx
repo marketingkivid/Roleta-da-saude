@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Emoji } from '@/lib/twemoji';
+import { Emoji, EmojiText } from '@/lib/twemoji';
 import type { Prize } from '@/hooks/useCampaign';
 
 interface ConsolationScreenProps {
@@ -8,7 +8,12 @@ interface ConsolationScreenProps {
   onReset: () => void;
 }
 
+const SIMULADOR_URL = 'https://kivid.com.br/simulador';
+
 const ConsolationScreen = ({ prize, participantName, onReset }: ConsolationScreenProps) => {
+  const firstName = (participantName || '').trim().split(' ')[0];
+  const hasImage = !!(prize.image_url && prize.image_url.trim());
+
   return (
     <div
       className="relative flex flex-col items-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-md lg:max-w-xl mx-auto w-full"
@@ -18,32 +23,48 @@ const ConsolationScreen = ({ prize, participantName, onReset }: ConsolationScree
         paddingRight: 'max(16px, env(safe-area-inset-right))',
       }}
     >
-      <div className="w-40 h-40 sm:w-48 sm:h-48 lg:w-64 lg:h-64 rounded-2xl bg-muted flex items-center justify-center mt-2 sm:mt-4 overflow-hidden shadow-lg animate-prize-reveal shrink-0">
-        <img src={prize.image_url} alt={prize.name} className="w-32 h-32 sm:w-40 sm:h-40 lg:w-56 lg:h-56 object-contain" />
+      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl bg-muted flex items-center justify-center mt-2 sm:mt-4 overflow-hidden animate-prize-reveal shrink-0">
+        {hasImage ? (
+          <img src={prize.image_url} alt="" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
+        ) : (
+          <Emoji emoji="🍀" label="" size={72} />
+        )}
       </div>
 
-      <p className="mt-6 text-xl sm:text-2xl lg:text-4xl font-black text-center"><Emoji emoji="😢" label="" /> Não foi dessa vez…</p>
-      <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-muted-foreground mt-1 text-center break-words w-full px-2">
-        {prize.name}
+      <p className="mt-6 text-2xl sm:text-3xl font-black text-center">Não foi dessa vez…</p>
+      <p className="mt-2 text-base sm:text-lg text-foreground/70 text-center text-balance max-w-sm">
+        <EmojiText>{`${firstName ? firstName + ', a' : 'A'} sua chance nesta roleta acabou aqui. Mas a Kivid solta roleta nova de tempos em tempos — sempre com prêmios diferentes. 💜`}</EmojiText>
       </p>
 
-
-      <div className="w-full mt-6 sm:mt-8 bg-muted rounded-xl p-4 sm:p-5 lg:p-8">
-        <p className="text-base sm:text-lg lg:text-xl font-medium mb-1 break-words">{participantName}, não desanime! <Emoji emoji="💪" label="" /></p>
-        <p className="text-base sm:text-lg lg:text-xl text-foreground/70 break-words">{prize.description}</p>
-      </div>
+      {prize.description && (
+        <div className="w-full mt-5 bg-muted rounded-xl p-4 sm:p-5">
+          <p className="text-base sm:text-lg text-foreground/70 break-words text-center">{prize.description}</p>
+        </div>
+      )}
 
       <div className="w-full mt-6 sm:mt-8 space-y-3">
         <Button size="lg" className="w-full rounded-full lg:text-lg lg:py-6" asChild>
-          <a href="https://kivid.com.br/simulador" target="_blank" rel="noopener noreferrer">
-            Veja mais ofertas
+          <a href={SIMULADOR_URL} target="_blank" rel="noopener noreferrer">
+            Ver o simulador Kivid →
           </a>
         </Button>
-        <Button variant="link" size="sm" className="w-full no-underline text-foreground/60 hover:text-foreground/40 hover:no-underline" onClick={onReset}>
-          ← Voltar ao início
+        <a
+          href="https://kivid.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center text-base font-bold text-primary hover:underline py-2"
+        >
+          Ver mais promoções
+        </a>
+        <Button
+          variant="link"
+          size="sm"
+          className="w-full no-underline text-foreground/60 hover:text-foreground/40 hover:no-underline"
+          onClick={onReset}
+        >
+          <span aria-hidden="true">←</span> Voltar ao início
         </Button>
       </div>
-
     </div>
   );
 };

@@ -24,7 +24,11 @@ const RewardScreen = ({ prize, participantName, onReset }: RewardScreenProps) =>
       <ConfettiCanvas />
 
       <div className="w-40 h-40 sm:w-48 sm:h-48 lg:w-64 lg:h-64 rounded-2xl bg-primary/10 flex items-center justify-center mt-2 sm:mt-4 overflow-hidden animate-prize-reveal shrink-0">
-        <img src={prize.image_url} alt={prize.name} className="w-32 h-32 sm:w-40 sm:h-40 lg:w-56 lg:h-56 object-contain" />
+        {prize.image_url && prize.image_url.trim() ? (
+          <img src={prize.image_url} alt="" className="w-32 h-32 sm:w-40 sm:h-40 lg:w-56 lg:h-56 object-contain" />
+        ) : (
+          <Emoji emoji={prize.emoji || '🎁'} label="" size={96} />
+        )}
       </div>
 
       <p className="mt-4 text-xl sm:text-2xl lg:text-4xl font-black text-center"><Emoji emoji="🎉" label="" /> Você ganhou!</p>

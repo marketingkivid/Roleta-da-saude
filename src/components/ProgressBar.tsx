@@ -1,20 +1,20 @@
 import { cn } from '@/lib/utils';
 
 interface ProgressBarProps {
-  currentStep: 'validation' | 'game' | 'reward';
+  currentStep: 'validation' | 'game' | 'reward' | 'consolation';
 }
 
-// Roleta flow (2 etapas visíveis ao usuário):
-// 1) Prêmio  → girar a roleta e ver o que ganhou (tela 'game')
-// 2) Resgatar → preencher o formulário e concluir (tela 'validation' e 'reward')
+// Fluxo da roleta (2 etapas visíveis ao jogador):
+// 1) Seus dados → preencher o formulário (tela 'validation')
+// 2) Girar → girar a roleta e ver o resultado (telas 'game', 'reward', 'consolation')
 const STEPS = [
-  { id: 'game', label: 'Prêmio' },
-  { id: 'resgatar', label: 'Resgatar' },
+  { id: 'dados', label: 'Seus dados' },
+  { id: 'girar', label: 'Girar' },
 ] as const;
 
 const stepIndex = (current: ProgressBarProps['currentStep']) => {
-  if (current === 'game') return 0;
-  // validation e reward compartilham a etapa "Resgatar"
+  if (current === 'validation') return 0;
+  // game, reward e consolation → etapa "Girar" (concluída nas telas de resultado)
   return 1;
 };
 

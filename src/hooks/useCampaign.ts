@@ -60,9 +60,11 @@ export function useCampaign(slug?: string) {
   // lead_ref for roulette (token-based or session uuid)
   const leadRefRef = useRef<string | null>(null);
 
-  // URL do simulador Kivid — destino em caso de derrota na roleta.
-  const SIMULADOR_URL = 'https://kivid.com.br/simulador';
-
+  // Chaves de estado local por campanha:
+  //  kivid_lead_<id>  → dados do formulário já enviados (antes de girar)
+  //  kivid_spun_<id>  → resultado da roleta (giro já usado — link "gasto")
+  //  kivid_played_<id>→ compat: mantido junto de kivid_spun_
+  const leadStorageKey = (id: string) => `kivid_lead_${id}`;
   const spunStorageKey = (id: string) => `kivid_spun_${id}`;
   const playedStorageKey = (id: string) => `kivid_played_${id}`;
 
@@ -72,6 +74,17 @@ export function useCampaign(slug?: string) {
       const raw = localStorage.getItem(spunStorageKey(id));
       if (!raw) return null;
       return JSON.parse(raw) as Prize;
+    } catch {
+      return null;
+    }
+  };
+
+  const restoreLead = (id: string): ParticipantData | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(leadStorageKey(id));
+      if (!raw) return null;
+      return JSON.parse(raw) as ParticipantData;
     } catch {
       return null;
     }
@@ -107,10 +120,12 @@ export function useCampaign(slug?: string) {
 
       const isTest = !!data.is_test;
 
-      // Campanha de teste: limpa bloqueios locais para permitir novo acesso.
+      // Campanha de teste: limpa todo o estado local para permitir repetir o
+      // fluxo inteiro (formulário + giro) a cada acesso.
       if (isTest && typeof window !== 'undefined') {
         localStorage.removeItem(playedStorageKey(data.id));
         localStorage.removeItem(spunStorageKey(data.id));
+        localStorage.removeItem(leadStorageKey(data.id));
       }
 
       setCampaignId(data.id);
@@ -161,17 +176,18 @@ export function useCampaign(slug?: string) {
           phone: res.phone || '',
         });
 
-        // Se o usuário já girou (persistido localmente) mas ainda não enviou o
-        // formulário, decide o próximo passo com base no resultado:
-        // - Prêmio real → volta ao formulário de validação (1 giro por sessão).
-        // - Consolação  → não há cadastro; marca como já jogado.
-        const restored = restoreSpunPrize(data.id);
-        if (restored && !localStorage.getItem(playedStorageKey(data.id))) {
-          setPrize(restored);
-          setStep(restored.is_consolation ? 'consolation' : 'validation');
+        // Já girou este link → giro gasto → "Você já veio por aqui".
+        if (restoreSpunPrize(data.id)) {
+          setStep('already_played');
           return;
         }
-
+        // Já preencheu o formulário mas ainda não girou → retoma direto na roleta.
+        const lead = restoreLead(data.id);
+        if (lead) {
+          setParticipantData(lead);
+          setStep('game');
+          return;
+        }
 
         setStep('landing');
         return;
@@ -187,15 +203,15 @@ export function useCampaign(slug?: string) {
       }
       leadRefRef.current = ref;
 
-      if (typeof window !== 'undefined' && localStorage.getItem(playedStorageKey(data.id))) {
+      if (typeof window !== 'undefined' && (restoreSpunPrize(data.id) || localStorage.getItem(playedStorageKey(data.id)))) {
+        // Giro já usado neste link → "Você já veio por aqui".
         setStep('already_played');
       } else {
-        // Já girou nesta sessão: se ganhou, retoma o formulário; se perdeu,
-        // marca como já jogado (fluxo de derrota termina no simulador).
-        const restored = restoreSpunPrize(data.id);
-        if (restored) {
-          setPrize(restored);
-          setStep(restored.is_consolation ? 'consolation' : 'validation');
+        // Formulário já enviado mas ainda não girou → retoma direto na roleta.
+        const lead = restoreLead(data.id);
+        if (lead) {
+          setParticipantData(lead);
+          setStep('game');
         } else {
           setStep('landing');
         }
@@ -231,23 +247,17 @@ export function useCampaign(slug?: string) {
 
   const goToValidation = useCallback(() => {
     setValidationError(undefined);
-    // Roleta flow: usuário gira primeiro, formulário aparece após o prêmio.
-    setStep('game');
+    // Fluxo: os dados vêm ANTES de girar a roleta.
+    setStep('validation');
   }, []);
 
   const submitValidation = useCallback(async (data: ParticipantData): Promise<{ success: boolean; error?: string }> => {
     setValidationError(undefined);
-
-    if (!prize) {
-      const msg = 'Gire a roleta antes de enviar seus dados.';
-      setValidationError(msg);
-      return { success: false, error: msg };
-    }
-
     setParticipantData(data);
 
-    // Token campaign: update contact fields via SECURITY DEFINER RPC (no open UPDATE policy).
+    // Registra o lead agora (antes de girar) — ganhe ou perca.
     if (hasParticipantList && participantId) {
+      // Campanha com lista: atualiza contato via RPC SECURITY DEFINER.
       await supabase.rpc('update_participant_contact', {
         p_participant_id: participantId,
         p_name: data.name,
@@ -255,7 +265,7 @@ export function useCampaign(slug?: string) {
         p_phone: data.whatsapp,
       } as any);
     } else if (campaignId) {
-      // Open campaign: create the participant record now
+      // Campanha aberta: cria o participante.
       await supabase.from('campaign_participants').insert({
         campaign_id: campaignId,
         name: data.name,
@@ -265,25 +275,14 @@ export function useCampaign(slug?: string) {
       } as any);
     }
 
-    // Record the participation with the drawn prize
-    await supabase.from('participations').insert({
-      name: data.name,
-      email: data.email,
-      whatsapp: data.whatsapp,
-      prize_id: prize.id,
-      campaign_id: campaignId,
-    });
-
-    if (participantId) {
-      await supabase.rpc('mark_participant_played', { p_participant_id: participantId });
+    // Persiste os dados localmente para retomar direto na roleta se recarregar.
+    if (campaignId && typeof window !== 'undefined') {
+      try { localStorage.setItem(leadStorageKey(campaignId), JSON.stringify(data)); } catch { /* noop */ }
     }
 
-    const storageKey = campaignId ? `kivid_played_${campaignId}` : 'kivid_played';
-    localStorage.setItem(storageKey, 'true');
-
-    setStep(prize.is_consolation ? 'consolation' : 'reward');
+    setStep('game');
     return { success: true };
-  }, [campaignId, hasParticipantList, prize, participantId]);
+  }, [campaignId, hasParticipantList, participantId]);
 
 
 
@@ -302,8 +301,9 @@ export function useCampaign(slug?: string) {
     return data as SpinResult;
   }, [campaignId]);
 
-  // Called after roulette animation lands + reveal — collects prize and routes to post-win form
-  const finalizeRouletteWin = useCallback(async (spinResult: SpinResult) => {
+  // Chamado quando a roleta para e o modal é dispensado. Registra a participação
+  // com o prêmio sorteado e leva para a tela de resultado (recompensa/consolação).
+  const finalizeRouletteResult = useCallback(async (spinResult: SpinResult) => {
     const { prize: p } = spinResult;
     const won: Prize = {
       id: p.id,
@@ -327,40 +327,40 @@ export function useCampaign(slug?: string) {
 
     setPrize(won);
 
-    // Persiste "já girou" para que, ao retornar à roleta, o usuário caia
-    // direto no formulário em vez de poder girar de novo (regra existente
-    // de 1 giro por sessão, agora persistida também no client).
+    // Marca o giro como usado — este link não gira mais (reabrir → "já veio").
     if (campaignId && typeof window !== 'undefined') {
       try {
         localStorage.setItem(spunStorageKey(campaignId), JSON.stringify(won));
+        localStorage.setItem(playedStorageKey(campaignId), 'true');
       } catch { /* noop */ }
     }
 
-    if (p.is_consolation) {
-      // Derrota: ao fechar o modal de "Não foi dessa vez", vai para a tela
-      // de consolação (com "Voltar ao início"), em vez da tela "já jogou".
-      setStep('consolation');
-      return;
+    // Registra a participação com o prêmio (o lead já foi criado no formulário).
+    await supabase.from('participations').insert({
+      name: participantData.name,
+      email: participantData.email,
+      whatsapp: participantData.whatsapp,
+      prize_id: won.id,
+      campaign_id: campaignId,
+    });
+
+    if (participantId) {
+      await supabase.rpc('mark_participant_played', { p_participant_id: participantId });
     }
 
-    // Vitória: seguir para o formulário de cadastro.
-    setStep('validation');
+    setStep(won.is_consolation ? 'consolation' : 'reward');
+  }, [campaignId, participantData, participantId]);
 
-  }, [campaignId]);
-
-  // Fechar modal de resultado (× / backdrop / ESC) → tela "já participou".
-  const closeRouletteModal = useCallback(() => {
-    if (campaignId && typeof window !== 'undefined') {
-      try { localStorage.setItem(playedStorageKey(campaignId), 'true'); } catch { /* noop */ }
-    }
+  // "Voltar ao início" nas telas de resultado → encerra e vai para "já veio".
+  const finishCampaign = useCallback(() => {
     setStep('already_played');
-  }, [campaignId]);
-
+  }, []);
 
   const resetCampaign = useCallback(() => {
     if (campaignId && typeof window !== 'undefined') {
       localStorage.removeItem(playedStorageKey(campaignId));
       localStorage.removeItem(spunStorageKey(campaignId));
+      localStorage.removeItem(leadStorageKey(campaignId));
     } else if (typeof window !== 'undefined') {
       localStorage.removeItem('kivid_played');
     }
@@ -392,7 +392,7 @@ export function useCampaign(slug?: string) {
     prefillData,
     campaignId,
     spinRoulette,
-    finalizeRouletteWin,
-    closeRouletteModal,
+    finalizeRouletteResult,
+    finishCampaign,
   };
 }

@@ -45,8 +45,8 @@ const Index = () => {
     prefillData,
     campaignId,
     spinRoulette,
-    finalizeRouletteWin,
-    closeRouletteModal,
+    finalizeRouletteResult,
+    finishCampaign,
   } = useCampaign(slug);
 
   // Loading state
@@ -176,7 +176,7 @@ const Index = () => {
       </a>
       <Header show={!isLanding} />
       {showProgress && (
-        <ProgressBar currentStep={step as 'validation' | 'game' | 'reward'} />
+        <ProgressBar currentStep={step as 'validation' | 'game' | 'reward' | 'consolation'} />
       )}
 
       <main
@@ -199,50 +199,29 @@ const Index = () => {
         {isLanding && <LandingScreen onStart={goToValidation} />}
         <Suspense fallback={<ScreenFallback />}>
           {step === 'validation' && (
-            <>
-              {prize && (
-                <div className="max-w-md mx-auto w-full px-4 sm:px-8 pt-2 shrink-0">
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="rounded-2xl p-3 sm:p-4 flex items-center gap-3 animate-fade-in bg-muted border border-primary/30"
-                  >
-                    <div className="text-3xl sm:text-4xl shrink-0"><Emoji emoji={prize.emoji || '🎁'} label="" /></div>
-                    <div className="flex-1">
-                      <p className="text-xs font-bold uppercase tracking-wider text-primary">
-                        Você ganhou
-                      </p>
-                      <p className="text-base sm:text-lg font-black text-foreground leading-tight break-words">{prize.name}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <ValidationScreen
-                termsAccepted={termsAccepted}
-                lgpdAccepted={lgpdAccepted}
-                setTermsAccepted={setTermsAccepted}
-                setLgpdAccepted={setLgpdAccepted}
-                onSubmit={submitValidation}
-                hasParticipantList={hasParticipantList}
-                validationError={validationError}
-                prefillData={prefillData ?? undefined}
-                postWin={!!prize}
-              />
-            </>
+            <ValidationScreen
+              termsAccepted={termsAccepted}
+              lgpdAccepted={lgpdAccepted}
+              setTermsAccepted={setTermsAccepted}
+              setLgpdAccepted={setLgpdAccepted}
+              onSubmit={submitValidation}
+              hasParticipantList={hasParticipantList}
+              validationError={validationError}
+              prefillData={prefillData ?? undefined}
+            />
           )}
           {step === 'game' && campaignId && (
             <RouletteScreen
               campaignId={campaignId}
               onSpin={spinRoulette}
-              onFinish={finalizeRouletteWin}
-              onClose={closeRouletteModal}
+              onFinish={finalizeRouletteResult}
             />
           )}
           {step === 'reward' && prize && (
-            <RewardScreen prize={prize} participantName={participantData.name} onReset={resetCampaign} />
+            <RewardScreen prize={prize} participantName={participantData.name} onReset={finishCampaign} />
           )}
           {step === 'consolation' && prize && (
-            <ConsolationScreen prize={prize} participantName={participantData.name} onReset={resetCampaign} />
+            <ConsolationScreen prize={prize} participantName={participantData.name} onReset={finishCampaign} />
           )}
           {step === 'already_played' && <AlreadyPlayedScreen onReset={resetCampaign} />}
         </Suspense>
