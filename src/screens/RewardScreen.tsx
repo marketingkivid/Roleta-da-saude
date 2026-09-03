@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import ConfettiCanvas from '@/components/ConfettiCanvas';
+import { Emoji } from '@/lib/twemoji';
 
 import type { Prize } from '@/hooks/useCampaign';
 
@@ -26,14 +27,14 @@ const RewardScreen = ({ prize, participantName, onReset }: RewardScreenProps) =>
         <img src={prize.image_url} alt={prize.name} className="w-32 h-32 sm:w-40 sm:h-40 lg:w-56 lg:h-56 object-contain" />
       </div>
 
-      <p className="mt-4 text-xl sm:text-2xl lg:text-4xl font-black text-center"><span aria-hidden="true">🎉</span> Você ganhou!</p>
+      <p className="mt-4 text-xl sm:text-2xl lg:text-4xl font-black text-center"><Emoji emoji="🎉" label="" /> Você ganhou!</p>
       <p className="text-xl sm:text-2xl lg:text-4xl font-bold text-secondary mt-1 text-center leading-tight break-words w-full px-2">
         {prize.name}
       </p>
 
 
       <div className="w-full mt-6 bg-card border border-border rounded-2xl p-4 lg:p-8">
-        <p className="text-base lg:text-xl font-medium mb-1 break-words">Parabéns, {participantName}! 🥳</p>
+        <p className="text-base lg:text-xl font-medium mb-1 break-words">Parabéns, {participantName}! <Emoji emoji="🥳" label="" /></p>
         {prize.description && (
           <p className="text-sm sm:text-base lg:text-xl text-foreground/70 break-words">{prize.description}</p>
         )}

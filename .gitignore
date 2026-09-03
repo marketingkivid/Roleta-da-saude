@@ -5,3 +5,6 @@ dist-ssr
 .DS_Store
 playwright-report
 test-results
+
+# Twemoji assets — sincronizados via scripts/sync-twemoji.mjs (predev/prebuild)
+/public/twemoji/

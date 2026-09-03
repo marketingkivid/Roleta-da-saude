@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import TermsCheckbox from '@/components/TermsCheckbox';
+import { Emoji, EmojiText } from '@/lib/twemoji';
 import { Loader2 } from 'lucide-react';
 
 interface ValidationScreenProps {
@@ -91,9 +92,9 @@ const ValidationScreen = ({
       }}
     >
       <div className="flex items-start gap-3 mb-3 sm:mb-6 w-full">
-        <span className="text-2xl sm:text-5xl shrink-0 leading-none" aria-hidden="true">🦋</span>
+        <Emoji emoji="🦋" label="" className="text-2xl sm:text-5xl shrink-0 leading-none" />
         <div role="status" className="bg-muted rounded-xl rounded-tl-none px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-lg leading-snug break-words min-w-0">
-          {bubbleMessage}
+          <EmojiText>{bubbleMessage}</EmojiText>
         </div>
       </div>
 
@@ -120,7 +121,7 @@ const ValidationScreen = ({
             aria-describedby={errors.name ? 'name-error' : undefined}
             className="w-full h-12 sm:h-16 px-4 rounded-xl border border-input bg-background text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring outline-none transition-all"
           />
-          {errors.name && <p id="name-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1">{errors.name}</p>}
+          {errors.name && <p id="name-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1"><EmojiText>{errors.name}</EmojiText></p>}
         </div>
 
         <div>
@@ -142,7 +143,7 @@ const ValidationScreen = ({
             placeholder="seu@email.com"
             className="w-full h-12 sm:h-16 px-4 rounded-xl border border-input bg-background text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring outline-none transition-all"
           />
-          {errors.email && <p id="email-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1">{errors.email}</p>}
+          {errors.email && <p id="email-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1"><EmojiText>{errors.email}</EmojiText></p>}
         </div>
 
         <div>
@@ -162,7 +163,7 @@ const ValidationScreen = ({
             placeholder="(00) 00000-0000"
             className="w-full h-12 sm:h-16 px-4 rounded-xl border border-input bg-background text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring outline-none transition-all"
           />
-          {errors.whatsapp && <p id="whatsapp-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1">{errors.whatsapp}</p>}
+          {errors.whatsapp && <p id="whatsapp-error" role="alert" className="text-sm sm:text-base text-red-700 mt-1"><EmojiText>{errors.whatsapp}</EmojiText></p>}
         </div>
 
         <div className="space-y-1.5 sm:space-y-3 pt-0.5 sm:pt-2" role="group" aria-label="Termos e privacidade">
@@ -190,7 +191,7 @@ const ValidationScreen = ({
               Política de Privacidade (LGPD)
             </a>
           </TermsCheckbox>
-          {errors.terms && <p role="alert" className="text-sm sm:text-base text-red-700">{errors.terms}</p>}
+          {errors.terms && <p role="alert" className="text-sm sm:text-base text-red-700"><EmojiText>{errors.terms}</EmojiText></p>}
         </div>
 
 

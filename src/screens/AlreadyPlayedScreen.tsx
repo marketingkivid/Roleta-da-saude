@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Emoji, EmojiText } from '@/lib/twemoji';
 
 interface AlreadyPlayedScreenProps {
   onReset: () => void;
@@ -13,11 +14,11 @@ const AlreadyPlayedScreen = ({ onReset }: AlreadyPlayedScreenProps) => (
       paddingRight: 'max(16px, env(safe-area-inset-right))',
     }}
   >
-    <span className="text-6xl sm:text-7xl mb-4 sm:mb-6" aria-hidden="true">🦋</span>
+    <Emoji emoji="🦋" label="" className="text-6xl sm:text-7xl mb-4 sm:mb-6 block" />
 
     <h1 className="text-2xl sm:text-3xl font-black text-balance">Você já veio por aqui!</h1>
     <p className="mt-4 text-foreground/70 max-w-xs text-base sm:text-lg text-balance">
-      Ficamos felizes que participou da nossa surpresa. Continue cuidando da sua saúde com a gente! 💜
+      <EmojiText>Ficamos felizes que participou da nossa surpresa. Continue cuidando da sua saúde com a gente! 💜</EmojiText>
     </p>
 
     <div className="mt-8 w-full max-w-xs space-y-3">

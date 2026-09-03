@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ProgressBar from '@/components/ProgressBar';
 import LandingScreen from '@/screens/LandingScreen';
+import { Emoji } from '@/lib/twemoji';
 import { useCampaign } from '@/hooks/useCampaign';
 
 const ValidationScreen = lazy(() => import('@/screens/ValidationScreen'));
@@ -98,7 +99,7 @@ const Index = () => {
     return (
       <main className="min-h-dvh flex items-center justify-center" style={infoMainStyle}>
         <div className={infoCardClass} style={infoCardStyle}>
-          <div style={{ fontSize: 48, marginBottom: 16 }} aria-hidden="true">🎯</div>
+          <div style={{ marginBottom: 16 }}><Emoji emoji="🎯" label="" size={48} /></div>
           <h1 className="text-lg sm:text-xl font-bold mb-2" style={{ color: '#1A1A2E' }}>Acesse pelo link da campanha</h1>
           <p className="text-sm sm:text-base" style={{ color: '#9B8FAE' }}>Nossas campanhas funcionam através de links exclusivos. Acesse pelo link que você recebeu.</p>
         </div>
@@ -111,7 +112,7 @@ const Index = () => {
     return (
       <main className="min-h-dvh flex items-center justify-center" style={infoMainStyle}>
         <div className={infoCardClass} style={infoCardStyle}>
-          <div style={{ fontSize: 48, marginBottom: 16 }} aria-hidden="true">🔍</div>
+          <div style={{ marginBottom: 16 }}><Emoji emoji="🔍" label="" size={48} /></div>
           <h1 className="text-lg sm:text-xl font-bold mb-2" style={{ color: '#1A1A2E' }}>Campanha não encontrada</h1>
           <p className="text-sm sm:text-base mb-6" style={{ color: '#9B8FAE' }}>O link que você acessou não corresponde a nenhuma campanha ativa.</p>
           <Link to="/" style={infoCtaStyle}>Voltar ao início</Link>
@@ -125,7 +126,7 @@ const Index = () => {
     return (
       <main className="min-h-dvh flex items-center justify-center" style={infoMainStyle}>
         <div className={infoCardClass} style={infoCardStyle}>
-          <div style={{ fontSize: 48, marginBottom: 16 }} aria-hidden="true">⏸️</div>
+          <div style={{ marginBottom: 16 }}><Emoji emoji="⏸️" label="" size={48} /></div>
           <h1 className="text-lg sm:text-xl font-bold mb-2 text-balance" style={{ color: '#1A1A2E' }}>Esta campanha ainda não está disponível</h1>
           <p className="text-sm sm:text-base mb-6" style={{ color: '#9B8FAE' }}>A campanha pode ter sido encerrada ou ainda não foi ativada.</p>
           <Link to="/" style={infoCtaStyle}>Voltar ao início</Link>
@@ -139,7 +140,7 @@ const Index = () => {
     return (
       <main className="min-h-dvh flex items-center justify-center" style={infoMainStyle}>
         <div className={infoCardClass} style={infoCardStyle}>
-          <div style={{ fontSize: 48, marginBottom: 16 }} aria-hidden="true">🔒</div>
+          <div style={{ marginBottom: 16 }}><Emoji emoji="🔒" label="" size={48} /></div>
           <h1 className="text-lg sm:text-xl font-bold mb-2" style={{ color: '#1A1A2E' }}>Acesso exclusivo</h1>
           <p className="text-sm sm:text-base" style={{ color: '#9B8FAE' }}>Esta campanha é exclusiva para convidados. Acesse pelo link enviado para você.</p>
         </div>
@@ -152,7 +153,7 @@ const Index = () => {
     return (
       <main className="min-h-dvh flex items-center justify-center" style={infoMainStyle}>
         <div className={infoCardClass} style={infoCardStyle}>
-          <div style={{ fontSize: 48, marginBottom: 16 }} aria-hidden="true">⚠️</div>
+          <div style={{ marginBottom: 16 }}><Emoji emoji="⚠️" label="" size={48} /></div>
           <h1 className="text-lg sm:text-xl font-bold mb-2" style={{ color: '#1A1A2E' }}>Link inválido</h1>
           <p className="text-sm sm:text-base" style={{ color: '#9B8FAE' }}>Este link é inválido ou já expirou. Verifique o link enviado para você.</p>
         </div>
@@ -206,7 +207,7 @@ const Index = () => {
                     aria-live="polite"
                     className="rounded-2xl p-3 sm:p-4 flex items-center gap-3 animate-fade-in bg-muted border border-primary/30"
                   >
-                    <div className="text-3xl sm:text-4xl shrink-0" aria-hidden="true">{prize.emoji || '🎁'}</div>
+                    <div className="text-3xl sm:text-4xl shrink-0"><Emoji emoji={prize.emoji || '🎁'} label="" /></div>
                     <div className="flex-1">
                       <p className="text-xs font-bold uppercase tracking-wider text-primary">
                         Você ganhou

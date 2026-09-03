@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { SLICE_TOKENS } from '@/components/admin/WheelConfig';
 import { fitWheelLabel } from '@/lib/wheel-label';
+import { twemojiUrl, Emoji, EmojiText } from '@/lib/twemoji';
 import type { SpinResult } from '@/hooks/useCampaign';
-import rouletteHub from '@/assets/roulette-hub.png.asset.json';
+import kividMark from '@/assets/kivid-mark.svg';
 
 
 interface Segment {
@@ -44,16 +44,17 @@ const GOLD = PITAYA_600;
 const GOLD_DEEP = PITAYA_900;
 const BG_DARK = BG;
 
-// Alternância entre dois tons Pitaya escuros — garante contraste do texto branco.
-const DEFAULT_SLICE_COLORS = [PITAYA_600, PITAYA_800];
+// ── Roleta — design final Kivid (referência: imagem final da roleta) ──────────
+// A roleta ao vivo SEMPRE alterna lavanda × magenta (independente do token de
+// cor escolhido no admin), para bater exatamente com o design aprovado.
+const SLICE_MAGENTA = '#A72F86';   // fatia magenta
+const SLICE_LAVENDER = '#A98CDB';  // fatia lavanda (periwinkle)
+const RIM = '#6E1F3C';             // aro vinho escuro (flat, sem gradiente)
+const RIM_EDGE = '#8A2A50';        // linha do aro (levemente mais clara)
+const RIM_BULB_MAGENTA = '#C63C99';// lâmpada magenta do aro (alterna com creme)
+const POINTER = '#C0338F';         // ponteiro magenta
 
-
-
-const tokenToHex = (token: string | null, fallbackIdx: number) => {
-  const found = SLICE_TOKENS.find(t => t.token === token);
-  if (found) return found.hex;
-  return DEFAULT_SLICE_COLORS[fallbackIdx % DEFAULT_SLICE_COLORS.length];
-};
+const sliceColor = (i: number) => (i % 2 === 0 ? SLICE_MAGENTA : SLICE_LAVENDER);
 
 const polar = (cx: number, cy: number, r: number, angleRad: number) => ({
   x: cx + r * Math.cos(angleRad),
@@ -581,7 +582,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
     return (
       <div className="flex-1 flex items-center justify-center py-10 px-6 text-center" style={{ fontFamily: 'Nunito, sans-serif' }}>
         <div style={{ background: '#FFFFFF', border: `1px solid ${LAVENDER}`, borderRadius: 20, padding: 32, maxWidth: 420 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🎡</div>
+          <div style={{ marginBottom: 12 }}><Emoji emoji="🎡" label="" size={40} /></div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: PURPLE_DEEP, marginBottom: 6 }}>Roleta em preparação</h1>
           <p style={{ color: '#6B5B8A', fontSize: 14 }}>Esta campanha ainda não tem segmentos suficientes.</p>
         </div>
@@ -602,8 +603,8 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
     const path = `M ${cx} ${cy} L ${p0.x} ${p0.y} A ${r} ${r} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
     const midAngle = start + angleRad / 2;
     const labelPos = polar(cx, cy, r * 0.78, midAngle);
-    // Alternate purple / lavender when color_token missing
-    const color = tokenToHex(seg.color_token, i);
+    // Design final: alterna sempre magenta × lavanda (ignora token do admin).
+    const color = sliceColor(i);
     return { seg, path, labelPos, color, midDeg: (midAngle * 180) / Math.PI };
   });
 
@@ -669,13 +670,13 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
         >
           <svg width={34} height={44} viewBox="0 0 34 44">
             <polygon
-              points="17,44 2,4 32,4"
-              fill={GOLD}
-              stroke={GOLD_DEEP}
-              strokeWidth={2}
+              points="17,43 3,5 31,5"
+              fill={POINTER}
+              stroke={RIM}
+              strokeWidth={2.5}
               strokeLinejoin="round"
             />
-            <circle cx={17} cy={10} r={4} fill={CREAM} />
+            <circle cx={17} cy={11} r={3.5} fill={WHITE} />
           </svg>
         </div>
 
@@ -703,21 +704,10 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
                   : 'none',
             }}
           >
-          <defs>
-            <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="90%" stopColor={GOLD} />
-              <stop offset="100%" stopColor={GOLD_DEEP} />
-            </radialGradient>
-            <radialGradient id="hubGrad" cx="30%" cy="30%">
-              <stop offset="0%" stopColor="#FFF3C6" />
-              <stop offset="70%" stopColor={GOLD} />
-              <stop offset="100%" stopColor={GOLD_DEEP} />
-            </radialGradient>
-          </defs>
-
-          {/* Outer gold rim */}
-          <circle cx={cx} cy={cy} r={r + 14} fill="url(#rimGrad)" />
-          <circle cx={cx} cy={cy} r={r + 6} fill={PURPLE_DEEP} />
+          {/* Aro vinho — flat, sem gradiente (design final Kivid) */}
+          <circle cx={cx} cy={cy} r={r + 16} fill={RIM_EDGE} />
+          <circle cx={cx} cy={cy} r={r + 14} fill={RIM} />
+          <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke={RIM_EDGE} strokeWidth={2} />
 
           {/* Slices */}
           {slices.map(({ seg, path, labelPos, color, midDeg }, i) => {
@@ -731,6 +721,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             //    the slice center.
             const arcAtLabel = (2 * Math.PI * (r * 0.78)) / n;
             const emoji = (seg.emoji || '').trim();
+            const emojiHref = emoji ? twemojiUrl(emoji) : null;
             const imageUrl = (seg.image_url || '').trim();
             const hasImage = imageUrl.length > 0;
             const rawLabel = seg.is_consolation ? CONSOLATION_WHEEL_LABEL : (seg.label ?? '');
@@ -811,8 +802,8 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             }
 
             // No image — stack emoji + wrapped text centered on the slice.
-            const arcWidth = Math.max(24, arcAtLabel * 0.9);
-            const fitted = fitWheelLabel(rawLabel, arcWidth, { minFont: 9, maxFont: 15, maxLines: 3 });
+            const arcWidth = Math.max(24, arcAtLabel * 0.92);
+            const fitted = fitWheelLabel(rawLabel, arcWidth, { minFont: 8, maxFont: 15, maxLines: 3 });
             const textSize = fitted.fontSize;
             const lineH = fitted.lineHeight;
             const lineCount = fitted.lines.length;
@@ -844,15 +835,26 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
                   style={{ pointerEvents: 'none' }}
                 >
                   {emoji && (
-                    <text
-                      x={0}
-                      y={emojiY}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={emojiSize}
-                    >
-                      {emoji}
-                    </text>
+                    emojiHref ? (
+                      <image
+                        href={emojiHref}
+                        x={-emojiSize / 2}
+                        y={emojiY - emojiSize / 2}
+                        width={emojiSize}
+                        height={emojiSize}
+                        preserveAspectRatio="xMidYMid meet"
+                      />
+                    ) : (
+                      <text
+                        x={0}
+                        y={emojiY}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={emojiSize}
+                      >
+                        {emoji}
+                      </text>
+                    )
                   )}
                   {lineCount > 0 && (
                     <text
@@ -863,6 +865,10 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
                       fontSize={textSize}
                       fontWeight={800}
                       fill={WHITE}
+                      stroke={RIM}
+                      strokeWidth={2.4}
+                      strokeLinejoin="round"
+                      paintOrder="stroke"
                       style={{ fontFamily: 'Nunito, sans-serif' }}
                     >
                       {fitted.lines.map((line, li) => (
@@ -880,15 +886,15 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
 
 
 
-          {/* Bulbs on rim */}
+          {/* Lâmpadas do aro — creme × magenta (design final Kivid) */}
           {bulbs.map((b, i) => (
             <circle
               key={i}
               cx={b.x}
               cy={b.y}
               r={4.5}
-              fill={i % 2 === 0 ? CREAM : GOLD}
-              stroke={GOLD_DEEP}
+              fill={i % 2 === 0 ? CREAM : RIM_BULB_MAGENTA}
+              stroke={RIM}
               strokeWidth={0.75}
             />
           ))}
@@ -896,23 +902,34 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
           {/* Hub estático é renderizado fora do SVG rotativo (ver overlay abaixo) */}
         </svg>
 
-          {/* Hub estático — não gira junto com a roleta */}
-          <img
-            src={rouletteHub.url}
-            alt=""
+          {/* Hub estático — marca Kivid, não gira junto com a roleta */}
+          <div
             aria-hidden
             style={{
               position: 'absolute',
               left: '50%',
               top: '50%',
-              width: size * 0.24,
-              height: size * 0.24,
+              width: size * 0.235,
+              height: size * 0.235,
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'none',
               zIndex: 2,
-              objectFit: 'contain',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            <img
+              src={kividMark}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 1px 4px rgba(94, 15, 63, 0.28))',
+              }}
+            />
+          </div>
         </div>
 
         {/* Tooltip with the full prize name — overlay, does not affect slice layout */}
@@ -1063,9 +1080,9 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             <div
               className="animate-reveal-emoji inline-block"
               aria-hidden="true"
-              style={{ fontSize: 76, lineHeight: 1, margin: '4px 0 12px' }}
+              style={{ lineHeight: 1, margin: '4px 0 12px' }}
             >
-              {revealPrize.is_consolation ? '🍀' : (revealPrize.emoji || '🎁')}
+              <Emoji emoji={revealPrize.is_consolation ? '🍀' : (revealPrize.emoji || '🎁')} label="" size={76} />
             </div>
 
             <h2
@@ -1084,7 +1101,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
 
             {revealPrize.is_consolation ? (
               <p id="kv-reveal-desc" className="text-[15px] sm:text-sm" style={{ color: '#6B4B7A', marginBottom: 20, lineHeight: 1.45 }}>
-                Mas a sorte gosta de quem insiste! 💜 Enquanto isso, aproveite para conhecer as ofertas do Kivid e fique de olho — em breve novas chances de girar a roleta.
+                <EmojiText>Mas a sorte gosta de quem insiste! 💜 Enquanto isso, aproveite para conhecer as ofertas do Kivid e fique de olho — em breve novas chances de girar a roleta.</EmojiText>
               </p>
             ) : (
               revealPrize.description ? (
@@ -1142,7 +1159,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             )}
             <p className="text-[13px]" style={{ color: '#8A6BA0', marginTop: 10 }}>
               {revealPrize.is_consolation
-                ? 'Fique atento: novas roletas e ofertas em breve. 🎁'
+                ? <EmojiText>Fique atento: novas roletas e ofertas em breve. 🎁</EmojiText>
                 : 'Só falta 1 passo para receber.'}
             </p>
           </div>

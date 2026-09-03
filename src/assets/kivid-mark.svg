@@ -1,0 +1,35 @@
+<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="Kivid_Mark" data-name="Kivid Mark" viewBox="-2 1 56.6 46" width="56.6" height="46">
+  <defs>
+    <style>
+      .kvm-2 { fill: url(#kvm_grad_pink); }
+      .kvm-3 { fill: url(#kvm_grad_purple); }
+      .kvm-4 { fill: url(#kvm_grad_blue); }
+      .kvm-5 { fill: url(#kvm_grad_orange); }
+    </style>
+    <linearGradient id="kvm_grad_purple" x1="2.01" y1="27.62" x2="54.31" y2="27.62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#862de0"/>
+      <stop offset="1" stop-color="#e5509c"/>
+    </linearGradient>
+    <linearGradient id="kvm_grad_orange" x1="50.57" y1="8.34" x2="23.26" y2="28.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f47f4b"/>
+      <stop offset=".31" stop-color="#f48944"/>
+      <stop offset=".84" stop-color="#f5a633"/>
+      <stop offset="1" stop-color="#f6b02e"/>
+    </linearGradient>
+    <linearGradient id="kvm_grad_pink" x1="31.36" y1="11.51" x2="31.36" y2="43.44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e5509c"/>
+      <stop offset="1" stop-color="#f47f4b"/>
+    </linearGradient>
+    <linearGradient id="kvm_grad_blue" x1="22.72" y1="38.36" x2="52.93" y2="38.36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62bf7a"/>
+      <stop offset="1" stop-color="#40c5e8"/>
+    </linearGradient>
+  </defs>
+  <g id="Logo">
+    <path id="Purple" class="kvm-3" d="M47.27,31.71c-1.23.39-3.88.44-7.7-6.05-2.35-3.66-4.64-7.31-7.89-10.25-2.8-2.53-6.15-4.4-9.88-5.08-1.27-.23-2.56-.33-3.85-.31C7.33,10.21-1.46,19.58.2,30.43c2.17,14.21,17.38,15.89,26.54,14.32,1.99-.34,3.92-.97,5.75-1.81,5.53-2.53,10.48-6.29,14.77-11.23Z"/>
+    <path id="Orange" class="kvm-5" d="M32.07,43.13c5.75-2.55,10.89-6.42,15.32-11.55.07-.08.13-.15.2-.23-3.01,1.02-3.57-5.09-1.49-9.13,2.13-4.14,4.67-9.02,3.36-13.83-.86-3.77-7.75-11.78-19.7-6.83-7.74,3.43-13.23,11.9-14.18,20.62-.42,3.84.14,9.24,2.57,13.32,3.25,5.44,8.56,8.4,13.93,7.62Z"/>
+    <path id="Pink" class="kvm-2" d="M32.06,43.13s0,0,.01,0c5.7-2.53,10.8-6.35,15.2-11.42h0c-1.23.39-3.88.44-7.7-6.05-2.35-3.66-4.64-7.31-7.89-10.25-2.8-2.53-6.15-4.4-9.88-5.08-.6-.11-1.21-.19-1.82-.24-2.38,3.59-3.95,7.81-4.41,12.1-.42,3.84.14,9.24,2.57,13.32,3.24,5.43,8.55,8.39,13.91,7.62Z"/>
+    <path id="Blue" class="kvm-4" d="M52.3,30.68c-.05-.05-.09-.1-.15-.15-.87-.83-2.23-.97-3.25-.43-.5.26-.88.74-1.24,1.16-.09.11-.19.22-.28.33-6.62,7.67-14.82,12.53-24.27,14.36-.57.11-.58,1.01.27,1,3.69-.19,7.34-.93,10.85-2.06,3.16-1.02,6.21-2.35,9.12-3.95,2.27-1.25,4.48-2.66,6.51-4.28.92-.73,1.91-1.56,2.57-2.5.7-.98.7-2.52-.12-3.46Z"/>
+  </g>
+</svg>

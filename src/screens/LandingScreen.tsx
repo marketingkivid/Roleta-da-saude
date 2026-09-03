@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Emoji } from '@/lib/twemoji';
 
 interface LandingScreenProps {
   onStart: () => void;
@@ -15,10 +16,10 @@ const LandingScreen = ({ onStart }: LandingScreenProps) => {
       }}
     >
       <div className="relative mb-4 inline-block" aria-hidden="true">
-        <span className="text-7xl sm:text-8xl md:text-9xl inline-block animate-clover-sway">🍀</span>
-        <span className="absolute -top-2 -left-6 text-2xl sm:text-3xl animate-butterfly-1 select-none">🦋</span>
-        <span className="absolute -top-4 -right-4 sm:-right-6 text-2xl sm:text-3xl animate-butterfly-2 select-none">🦋</span>
-        <span className="absolute bottom-0 -right-8 text-xl sm:text-2xl animate-butterfly-3 select-none">🦋</span>
+        <Emoji emoji="🍀" label="" className="text-7xl sm:text-8xl md:text-9xl inline-block animate-clover-sway" />
+        <Emoji emoji="🦋" label="" className="absolute -top-2 -left-6 text-2xl sm:text-3xl animate-butterfly-1 select-none" />
+        <Emoji emoji="🦋" label="" className="absolute -top-4 -right-4 sm:-right-6 text-2xl sm:text-3xl animate-butterfly-2 select-none" />
+        <Emoji emoji="🦋" label="" className="absolute bottom-0 -right-8 text-xl sm:text-2xl animate-butterfly-3 select-none" />
       </div>
 
       <h1 className="text-[1.75rem] leading-[1.1] sm:text-4xl md:text-5xl sm:leading-tight font-black max-w-[320px] sm:max-w-md md:max-w-2xl relative z-10 text-balance">

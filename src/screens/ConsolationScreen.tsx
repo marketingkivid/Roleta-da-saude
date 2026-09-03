@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Emoji } from '@/lib/twemoji';
 import type { Prize } from '@/hooks/useCampaign';
 
 interface ConsolationScreenProps {
@@ -21,14 +22,14 @@ const ConsolationScreen = ({ prize, participantName, onReset }: ConsolationScree
         <img src={prize.image_url} alt={prize.name} className="w-32 h-32 sm:w-40 sm:h-40 lg:w-56 lg:h-56 object-contain" />
       </div>
 
-      <p className="mt-6 text-xl sm:text-2xl lg:text-4xl font-black text-center"><span aria-hidden="true">😢</span> Não foi dessa vez…</p>
+      <p className="mt-6 text-xl sm:text-2xl lg:text-4xl font-black text-center"><Emoji emoji="😢" label="" /> Não foi dessa vez…</p>
       <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-muted-foreground mt-1 text-center break-words w-full px-2">
         {prize.name}
       </p>
 
 
       <div className="w-full mt-6 sm:mt-8 bg-muted rounded-xl p-4 sm:p-5 lg:p-8">
-        <p className="text-base sm:text-lg lg:text-xl font-medium mb-1 break-words">{participantName}, não desanime! 💪</p>
+        <p className="text-base sm:text-lg lg:text-xl font-medium mb-1 break-words">{participantName}, não desanime! <Emoji emoji="💪" label="" /></p>
         <p className="text-base sm:text-lg lg:text-xl text-foreground/70 break-words">{prize.description}</p>
       </div>
 
