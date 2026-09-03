@@ -1,0 +1,1 @@
+ALTER TABLE public.campaigns ADD COLUMN discount_percentage numeric NOT NULL DEFAULT 0;

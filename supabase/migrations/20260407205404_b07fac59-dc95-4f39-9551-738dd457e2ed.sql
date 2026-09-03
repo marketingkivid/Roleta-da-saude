@@ -1,0 +1,2 @@
+ALTER TABLE public.campaigns
+ADD COLUMN IF NOT EXISTS has_participant_list BOOLEAN NOT NULL DEFAULT FALSE;

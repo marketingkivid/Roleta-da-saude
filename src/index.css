@@ -1,0 +1,189 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;500;600;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 180 20% 98.6%;
+    --foreground: 180 3% 23%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 180 3% 23%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 3% 23%;
+
+    --primary: 318 56% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 180 3% 23%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 180 20% 96%;
+    --muted-foreground: 180 5% 62%;
+
+    --accent: 191 69% 49%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 4 76% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 180 13% 90%;
+    --input: 180 5% 80%;
+    --ring: 318 56% 52%;
+
+    --radius: 1rem;
+
+    --progress-bg: 180 20% 96%;
+    --whatsapp: 142 70% 49%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 180 3% 23%;
+    --sidebar-primary: 318 56% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 180 20% 96%;
+    --sidebar-accent-foreground: 180 3% 23%;
+    --sidebar-border: 180 13% 90%;
+    --sidebar-ring: 318 56% 52%;
+
+    --kv-pink: #CF3A9D;
+    --kv-orange: #F28B3C;
+    --kv-blue: #2AB0D1;
+    --kv-green: #48B85E;
+    --kv-yellow: #F6B02E;
+    --kv-text: #393E3E;
+    --kv-text-dark: #1E2222;
+    --kv-border: #DEE7E7;
+    --kv-bg: #FAFCFC;
+    --kv-surface: #FFFFFF;
+    --kv-pink-light: #FAEAF4;
+    --kv-pink-pale: #FDF5FA;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+  .animate-prize-reveal {
+    animation: prizeReveal 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  .animate-confetti-fall {
+    animation: confettiFall var(--duration, 3s) linear forwards;
+  }
+  .animate-particle-burst {
+    animation: particleBurst 0.8s ease-out forwards;
+  }
+  .animate-spin-roulette {
+    animation: spinRoulette 2.5s linear infinite;
+  }
+  .animate-clover-sway {
+    animation: cloverSway 3s ease-in-out infinite;
+    transform-origin: 50% 90%;
+  }
+  .animate-butterfly-1 {
+    animation: butterflyFlutter1 3.2s ease-in-out infinite;
+  }
+  .animate-butterfly-2 {
+    animation: butterflyFlutter2 3.8s ease-in-out infinite;
+  }
+  .animate-butterfly-3 {
+    animation: butterflyFlutter3 3.5s ease-in-out infinite;
+  }
+}
+
+@keyframes cloverSway {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(6deg); }
+}
+@keyframes butterflyFlutter1 {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  50%      { transform: translate(-6px, -10px) rotate(10deg); }
+}
+@keyframes butterflyFlutter2 {
+  0%, 100% { transform: translate(0, 0) rotate(10deg); }
+  50%      { transform: translate(8px, -12px) rotate(-8deg); }
+}
+@keyframes butterflyFlutter3 {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg); }
+  50%      { transform: translate(6px, 8px) rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-clover-sway,
+  .animate-butterfly-1,
+  .animate-butterfly-2,
+  .animate-butterfly-3 { animation: none !important; }
+}
+
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes spinRoulette {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px) rotate(-2deg); }
+  40% { transform: translateX(5px) rotate(2deg); }
+  60% { transform: translateX(-3px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes prizeReveal {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes particleBurst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-shake,
+  .animate-prize-reveal,
+  .animate-confetti-fall,
+  .animate-particle-burst,
+  .animate-spin-roulette {
+    animation: none !important;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.kv-skeleton {
+  background: linear-gradient(90deg, #E8E0EE 25%, #f8f9f9 50%, #E8E0EE 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

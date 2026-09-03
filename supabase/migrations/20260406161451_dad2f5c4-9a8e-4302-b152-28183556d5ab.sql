@@ -1,0 +1,1 @@
+ALTER TABLE public.campaign_participants ADD COLUMN source text NOT NULL DEFAULT 'Outros';
