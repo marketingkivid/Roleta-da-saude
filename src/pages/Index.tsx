@@ -9,8 +9,7 @@ import { useCampaign } from '@/hooks/useCampaign';
 
 const ValidationScreen = lazy(() => import('@/screens/ValidationScreen'));
 const RouletteScreen = lazy(() => import('@/screens/RouletteScreen'));
-const RewardScreen = lazy(() => import('@/screens/RewardScreen'));
-const ConsolationScreen = lazy(() => import('@/screens/ConsolationScreen'));
+const ResultScreen = lazy(() => import('@/screens/ResultScreen'));
 const AlreadyPlayedScreen = lazy(() => import('@/screens/AlreadyPlayedScreen'));
 
 const ScreenFallback = () => (
@@ -217,11 +216,13 @@ const Index = () => {
               onFinish={finalizeRouletteResult}
             />
           )}
-          {step === 'reward' && prize && (
-            <RewardScreen prize={prize} participantName={participantData.name} onReset={finishCampaign} />
-          )}
-          {step === 'consolation' && prize && (
-            <ConsolationScreen prize={prize} participantName={participantData.name} onReset={finishCampaign} />
+          {(step === 'reward' || step === 'consolation') && prize && (
+            <ResultScreen
+              won={step === 'reward'}
+              prize={prize}
+              participantName={participantData.name}
+              onReset={finishCampaign}
+            />
           )}
           {step === 'already_played' && <AlreadyPlayedScreen onReset={resetCampaign} />}
         </Suspense>
