@@ -1099,7 +1099,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
 
             {revealPrize.is_consolation ? (
               <p id="kv-reveal-desc" className="text-[15px] sm:text-sm" style={{ color: '#6B4B7A', marginBottom: 20, lineHeight: 1.45 }}>
-                <EmojiText>Mas a sorte gosta de quem insiste! 💜 Enquanto isso, aproveite para conhecer as ofertas do Kivid e fique de olho — em breve novas chances de girar a roleta.</EmojiText>
+                <EmojiText>Cada link da roleta vale um giro — esse foi o seu. 🎯 Mas a Kivid vive lançando roleta nova, sempre com prêmios diferentes. Enquanto a próxima não chega, dá uma olhada nas ofertas de agora. 💜</EmojiText>
               </p>
             ) : (
               revealPrize.description ? (
@@ -1157,7 +1157,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, onClose }: RouletteScree
             )}
             <p className="text-[13px]" style={{ color: '#8A6BA0', marginTop: 10 }}>
               {revealPrize.is_consolation
-                ? <EmojiText>Fique atento: novas roletas e ofertas em breve. 🎁</EmojiText>
+                ? <EmojiText>A próxima roleta pode ter o prêmio que você quer. ✨</EmojiText>
                 : 'Só falta 1 passo para receber.'}
             </p>
           </div>

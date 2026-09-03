@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import ConfettiCanvas from '@/components/ConfettiCanvas';
-import { Emoji } from '@/lib/twemoji';
+import { Emoji, EmojiText } from '@/lib/twemoji';
 
 import type { Prize } from '@/hooks/useCampaign';
 
@@ -39,6 +39,10 @@ const RewardScreen = ({ prize, participantName, onReset }: RewardScreenProps) =>
           <p className="text-sm sm:text-base lg:text-xl text-foreground/70 break-words">{prize.description}</p>
         )}
       </div>
+
+      <p className="w-full mt-3 text-sm sm:text-base text-foreground/60 text-center break-words">
+        <EmojiText>Fica de olho no seu e-mail: sempre tem roleta Kivid nova chegando, com prêmios diferentes. 🎁</EmojiText>
+      </p>
 
 
 
