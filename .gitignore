@@ -11,3 +11,11 @@ test-results
 
 # Vercel
 .vercel
+
+# Env local (o .env com as chaves PÚBLICAS do Supabase fica versionado —
+# o build do Vercel lê ele; só os overrides locais é que são ignorados)
+.env.local
+.env.*.local
+
+# Supabase CLI (estado local)
+/supabase/.temp/
