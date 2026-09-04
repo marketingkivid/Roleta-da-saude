@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getPreviousRange, getSinceDate } from '@/components/admin/PeriodFilter';
-import { campaignUrl, campaignUrlLabel } from '@/lib/campaign-url';
+import { campaignUrl, campaignUrlLabel, publicBaseUrl } from '@/lib/campaign-url';
 
 describe('getPreviousRange', () => {
   it('devolve a janela imediatamente anterior à semana atual', () => {
@@ -20,13 +20,18 @@ describe('getPreviousRange', () => {
 });
 
 describe('campaign-url', () => {
-  it('usa o domínio em que o app está servido (jsdom = localhost)', () => {
-    expect(campaignUrl('minha-campanha')).toBe('http://localhost:3000/minha-campanha');
+  const base = publicBaseUrl(); // VITE_PUBLIC_URL ou window.location.origin
+
+  it('monta <base>/<slug>', () => {
+    expect(campaignUrl('minha-campanha')).toBe(`${base}/minha-campanha`);
   });
   it('anexa o token quando há lista', () => {
-    expect(campaignUrl('camp', 'abc123')).toBe('http://localhost:3000/camp?token=abc123');
+    expect(campaignUrl('camp', 'abc123')).toBe(`${base}/camp?token=abc123`);
   });
-  it('label sem protocolo', () => {
-    expect(campaignUrlLabel('promo')).toBe('localhost:3000/promo');
+  it('label é a URL sem protocolo', () => {
+    expect(campaignUrlLabel('promo')).toBe(`${base}/promo`.replace(/^https?:\/\//, ''));
+  });
+  it('não deixa barra dupla nem protocolo faltando', () => {
+    expect(campaignUrl('x')).toMatch(/^https?:\/\/[^/]+\/x$/);
   });
 });
