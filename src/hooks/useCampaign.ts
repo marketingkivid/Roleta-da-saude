@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getDeviceId } from '@/lib/device-id';
 import type { Tables } from '@/integrations/supabase/types';
 
 export type CampaignStep =
@@ -251,8 +252,10 @@ export function useCampaign(slug?: string) {
     setStep('validation');
   }, []);
 
-  const submitValidation = useCallback(async (data: ParticipantData): Promise<{ success: boolean; error?: string }> => {
+  const submitValidation = useCallback(async (raw: ParticipantData): Promise<{ success: boolean; error?: string }> => {
     setValidationError(undefined);
+    // E-mail sempre em minúsculo — dedupe consistente no servidor.
+    const data: ParticipantData = { ...raw, email: raw.email.trim().toLowerCase() };
     setParticipantData(data);
 
     // Registra o lead agora (antes de girar) — ganhe ou perca.
@@ -291,15 +294,22 @@ export function useCampaign(slug?: string) {
   // Roulette spin: calls edge function
   const spinRoulette = useCallback(async (): Promise<SpinResult | null> => {
     if (!campaignId || !leadRefRef.current) return null;
+    // Impressão digital do dispositivo + e-mail — blinda o giro único no servidor.
+    const device_id = await getDeviceId().catch(() => undefined);
     const { data, error } = await supabase.functions.invoke('spin-roulette', {
-      body: { campaign_id: campaignId, lead_ref: leadRefRef.current },
+      body: {
+        campaign_id: campaignId,
+        lead_ref: leadRefRef.current,
+        device_id,
+        email: participantData.email || undefined,
+      },
     });
     if (error || !data || data.error) {
       console.error('spin-roulette error', error || data?.error);
       return null;
     }
     return data as SpinResult;
-  }, [campaignId]);
+  }, [campaignId, participantData.email]);
 
   // Chamado quando a roleta para e o modal é dispensado. Registra a participação
   // com o prêmio sorteado e leva para a tela de resultado (recompensa/consolação).
@@ -351,30 +361,8 @@ export function useCampaign(slug?: string) {
     setStep(won.is_consolation ? 'consolation' : 'reward');
   }, [campaignId, participantData, participantId]);
 
-  // "Voltar ao início" nas telas de resultado → encerra e vai para "já veio".
-  const finishCampaign = useCallback(() => {
-    setStep('already_played');
-  }, []);
-
-  const resetCampaign = useCallback(() => {
-    if (campaignId && typeof window !== 'undefined') {
-      localStorage.removeItem(playedStorageKey(campaignId));
-      localStorage.removeItem(spunStorageKey(campaignId));
-      localStorage.removeItem(leadStorageKey(campaignId));
-    } else if (typeof window !== 'undefined') {
-      localStorage.removeItem('kivid_played');
-    }
-    setPrize(null);
-    setParticipantData({ name: '', email: '', whatsapp: '' });
-    setTermsAccepted(false);
-    setLgpdAccepted(false);
-    setValidationError(undefined);
-    setParticipantId(null);
-    setCurrentToken(null);
-    setPrefillData(null);
-    setStep('landing');
-  }, [campaignId]);
-
+  // Sem "resetar campanha": um giro por acesso é definitivo. Campanhas de teste
+  // já limpam todo o estado local a cada carregamento (ver loadCampaign).
 
   return {
     step,
@@ -386,13 +374,11 @@ export function useCampaign(slug?: string) {
     setLgpdAccepted,
     goToValidation,
     submitValidation,
-    resetCampaign,
     hasParticipantList,
     validationError,
     prefillData,
     campaignId,
     spinRoulette,
     finalizeRouletteResult,
-    finishCampaign,
   };
 }

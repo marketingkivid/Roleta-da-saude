@@ -38,14 +38,12 @@ const Index = () => {
     setLgpdAccepted,
     goToValidation,
     submitValidation,
-    resetCampaign,
     hasParticipantList,
     validationError,
     prefillData,
     campaignId,
     spinRoulette,
     finalizeRouletteResult,
-    finishCampaign,
   } = useCampaign(slug);
 
   // Loading state
@@ -221,10 +219,9 @@ const Index = () => {
               won={step === 'reward'}
               prize={prize}
               participantName={participantData.name}
-              onReset={finishCampaign}
             />
           )}
-          {step === 'already_played' && <AlreadyPlayedScreen onReset={resetCampaign} />}
+          {step === 'already_played' && <AlreadyPlayedScreen />}
         </Suspense>
       </main>
 

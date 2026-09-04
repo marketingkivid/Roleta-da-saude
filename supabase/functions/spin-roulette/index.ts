@@ -10,7 +10,38 @@ const supabase = createClient(
 const BodySchema = z.object({
   campaign_id: z.string().uuid(),
   lead_ref: z.string().min(1).max(200),
+  device_id: z.string().min(1).max(200).optional(),
+  email: z.string().email().max(320).optional(),
 });
+
+/** IP do cliente a partir dos headers do edge runtime. */
+function clientIp(req: Request): string | null {
+  const xff = req.headers.get("x-forwarded-for");
+  const raw = xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") ?? "").trim();
+  return raw || null;
+}
+
+/**
+ * Só usa o valor num filtro PostgREST `.or()` se for seguro (sem vírgula,
+ * parênteses ou aspas que poderiam alterar a query). Nossos valores legítimos
+ * (uuid, hash sha256, IP) passam; lixo de header é descartado.
+ */
+function safeForOr(v: string | null): string | null {
+  return v && /^[A-Za-z0-9._:%-]{1,200}$/.test(v) ? v : null;
+}
+
+/** Resposta padrão "já girou": devolve o mesmo prêmio, sem sortear de novo. */
+function alreadySpun(prev: PrizeRow, segments: WheelSegment[], corsHeaders: Record<string, string>) {
+  return new Response(
+    JSON.stringify({
+      segmentIndex: pickSegmentIndex(segments, prev.id),
+      totalSegments: segments.length,
+      prize: prizePayload(prev),
+      already_spun: true,
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
 
 type PrizeRow = {
   id: string;
@@ -121,6 +152,9 @@ Deno.serve(async (req) => {
       );
     }
     const { campaign_id, lead_ref } = parsed.data;
+    const device_id = parsed.data.device_id ?? null;
+    const email = parsed.data.email?.trim().toLowerCase() ?? null;
+    const client_ip = clientIp(req);
 
     const { data: campaign, error: cErr } = await supabase
       .from("campaigns")
@@ -206,29 +240,56 @@ Deno.serve(async (req) => {
       }
     }
 
-    // -- Open campaign (no list): enforce 1 spin per lead_ref, unless test campaign --
+    // -- Blindagem do giro único (campanhas reais, não-teste) --
+    //   lead_ref (sessão) · device_id (impressão digital) · client_ip
+    //   Vale para campanha aberta E com lista: se qualquer sinal já girou nesta
+    //   campanha, devolve o mesmo prêmio e não sorteia de novo.
     const isTest = !!(campaign as any).is_test;
-    if (!campaign.has_participant_list && !isTest) {
-      const { data: existingSpin } = await supabase
-        .from("campaign_spins")
-        .select("prize_id")
-        .eq("campaign_id", campaign_id)
-        .eq("lead_ref", lead_ref)
-        .maybeSingle();
+    if (!isTest) {
+      const safeLead = safeForOr(lead_ref);
+      const safeDevice = safeForOr(device_id);
+      const safeIp = safeForOr(client_ip);
 
-      if (existingSpin?.prize_id) {
-        const prev = (prizes as PrizeRow[]).find(p => p.id === existingSpin.prize_id);
-        if (prev) {
-          const segmentIndex = pickSegmentIndex(segments, prev.id);
-          return new Response(
-            JSON.stringify({
-              segmentIndex,
-              totalSegments: segments.length,
-              prize: prizePayload(prev),
-              already_spun: true,
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
+      const orParts: string[] = [];
+      if (safeLead) orParts.push(`lead_ref.eq.${safeLead}`);
+      if (safeDevice) orParts.push(`device_id.eq.${safeDevice}`);
+      if (safeIp) orParts.push(`client_ip.eq.${safeIp}`);
+
+      const { data: priorSpins } = orParts.length
+        ? await supabase
+            .from("campaign_spins")
+            .select("prize_id, lead_ref, device_id, client_ip")
+            .eq("campaign_id", campaign_id)
+            .or(orParts.join(","))
+            .limit(10)
+        : { data: [] as { prize_id: string; lead_ref: string; device_id: string | null; client_ip: string | null }[] };
+
+      const rows = priorSpins ?? [];
+      const blocker =
+        rows.find((s) => s.lead_ref === lead_ref) ||
+        (safeDevice ? rows.find((s) => s.device_id === device_id) : undefined) ||
+        // IP só bloqueia quando não temos impressão digital (evita falso
+        // positivo em redes compartilhadas / operadora móvel).
+        (!device_id && client_ip ? rows.find((s) => s.client_ip === client_ip) : undefined);
+
+      if (blocker?.prize_id) {
+        const prev = (prizes as PrizeRow[]).find((p) => p.id === blocker.prize_id);
+        if (prev) return alreadySpun(prev, segments, corsHeaders);
+      }
+
+      // Bloqueio por e-mail: mesmo e-mail não participa 2× nesta campanha
+      // (mesmo de outro navegador/dispositivo).
+      if (email) {
+        const { data: priorByEmail } = await supabase
+          .from("participations")
+          .select("prize_id")
+          .eq("campaign_id", campaign_id)
+          .eq("email", email)
+          .limit(1);
+        const prizeId = priorByEmail?.[0]?.prize_id;
+        if (prizeId) {
+          const prev = (prizes as PrizeRow[]).find((p) => p.id === prizeId);
+          if (prev) return alreadySpun(prev, segments, corsHeaders);
         }
       }
     }
@@ -256,12 +317,12 @@ Deno.serve(async (req) => {
         .is("spun_at", null); // race-safe: only if not already spun
     }
 
-    // Persist open-campaign spin for real (non-test) campaigns so this lead_ref
-    // can never spin again — even if localStorage is cleared.
-    if (!campaign.has_participant_list && !isTest) {
+    // Registra o giro (campanha aberta E com lista) com device_id + IP, para
+    // que nem limpar o navegador nem trocar de e-mail permita girar de novo.
+    if (!isTest) {
       await supabase
         .from("campaign_spins")
-        .insert({ campaign_id, lead_ref, prize_id: winner.id })
+        .insert({ campaign_id, lead_ref, prize_id: winner.id, device_id, client_ip })
         .select()
         .maybeSingle();
     }

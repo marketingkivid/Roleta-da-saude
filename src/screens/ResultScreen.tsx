@@ -8,8 +8,6 @@ interface ResultScreenProps {
   won: boolean;
   prize: Prize;
   participantName: string;
-  /** "Voltar ao início" → encerra a participação (não volta para a roleta). */
-  onReset: () => void;
 }
 
 const SIMULADOR_URL = 'https://kivid.com.br/simulador';
@@ -17,9 +15,9 @@ const KIVID_URL = 'https://kivid.com.br';
 
 /**
  * Tela única de resultado — mesma estética para vitória e derrota.
- * Só mudam os textos e os links (regra do Igor).
+ * Um único CTA, sem volta para a roleta (regra do Igor: giro é definitivo).
  */
-const ResultScreen = ({ won, prize, participantName, onReset }: ResultScreenProps) => {
+const ResultScreen = ({ won, prize, participantName }: ResultScreenProps) => {
   const firstName = (participantName || '').trim().split(' ')[0];
   const hasImage = !!(prize.image_url && prize.image_url.trim());
   const isWhatsApp = !!prize.checkout_url && /wa\.me|api\.whatsapp\.com/i.test(prize.checkout_url);
@@ -31,15 +29,11 @@ const ResultScreen = ({ won, prize, participantName, onReset }: ResultScreenProp
     ? `${firstName ? firstName + ', v' : 'V'}ocê garantiu: ${prize.name}. 🥳`
     : `${firstName ? firstName + ', a' : 'A'} sua chance nesta roleta acabou aqui. Mas a Kivid solta roleta nova de tempos em tempos — sempre com prêmios diferentes. 💜`;
 
-  const primary = won
+  const cta = won
     ? prize.checkout_url
       ? { label: 'Resgatar meu prêmio →', href: prize.checkout_url, newTab: !isWhatsApp }
       : { label: 'Conhecer o Kivid →', href: KIVID_URL, newTab: true }
     : { label: 'Ver o simulador Kivid →', href: SIMULADOR_URL, newTab: true };
-
-  const secondary = won
-    ? { label: 'Conhecer o Kivid', href: KIVID_URL }
-    : { label: 'Ver mais promoções', href: KIVID_URL };
 
   return (
     <div
@@ -74,30 +68,14 @@ const ResultScreen = ({ won, prize, participantName, onReset }: ResultScreenProp
         </div>
       )}
 
-      <div className="w-full mt-6 sm:mt-8 space-y-3">
+      <div className="w-full mt-6 sm:mt-8">
         <Button size="lg" className="w-full rounded-full lg:text-lg lg:py-6" asChild>
           <a
-            href={primary.href}
-            {...('newTab' in primary && primary.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            href={cta.href}
+            {...(cta.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           >
-            {primary.label}
+            {cta.label}
           </a>
-        </Button>
-        <a
-          href={secondary.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-center text-base font-bold text-primary hover:underline py-2"
-        >
-          {secondary.label}
-        </a>
-        <Button
-          variant="link"
-          size="sm"
-          className="w-full no-underline text-foreground/60 hover:text-foreground/40 hover:no-underline"
-          onClick={onReset}
-        >
-          <span aria-hidden="true">←</span> Voltar ao início
         </Button>
       </div>
     </div>

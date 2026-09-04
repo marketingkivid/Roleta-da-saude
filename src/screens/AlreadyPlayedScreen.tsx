@@ -1,11 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Emoji, EmojiText } from '@/lib/twemoji';
 
-interface AlreadyPlayedScreenProps {
-  onReset: () => void;
-}
-
-const AlreadyPlayedScreen = ({ onReset }: AlreadyPlayedScreenProps) => (
+const AlreadyPlayedScreen = () => (
   <div
     className="relative flex flex-col items-center justify-center min-h-[60vh] px-4 sm:px-6 lg:px-8 text-center max-w-md mx-auto w-full"
     style={{
@@ -24,18 +20,14 @@ const AlreadyPlayedScreen = ({ onReset }: AlreadyPlayedScreenProps) => (
       <EmojiText>Mas fica de olho no seu e-mail: a Kivid solta roletas novas de tempos em tempos, sempre com prêmios diferentes. 💜</EmojiText>
     </p>
 
-    <div className="mt-8 w-full max-w-xs space-y-3">
+    <div className="mt-8 w-full max-w-xs">
       <Button variant="hero" size="lg" asChild>
         <a href="https://kivid.com.br" target="_blank" rel="noopener noreferrer">
           Conhecer o Kivid
         </a>
       </Button>
-      <Button variant="link" size="sm" className="w-full no-underline text-foreground/60 hover:text-foreground/40 hover:no-underline" onClick={onReset}>
-        <span aria-hidden="true">←</span> Voltar ao início
-      </Button>
     </div>
   </div>
 );
-
 
 export default AlreadyPlayedScreen;
