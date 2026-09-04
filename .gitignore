@@ -8,3 +8,6 @@ test-results
 
 # Twemoji assets — sincronizados via scripts/sync-twemoji.mjs (predev/prebuild)
 /public/twemoji/
+
+# Vercel
+.vercel
