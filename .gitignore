@@ -19,3 +19,6 @@ test-results
 
 # Supabase CLI (estado local)
 /supabase/.temp/
+
+# Local Netlify folder
+.netlify

@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Zap, PauseCircle, Download } from 'lucide-react';
 import PeriodFilter, { type Period, getSinceDate, getPreviousRange } from './PeriodFilter';
 import { FONT, CARD } from '@/lib/admin-styles';
+import { campaignUrl } from '@/lib/campaign-url';
 
 /* ── Types ──────────────────────────────────────────── */
 interface DailyAccess { date: string; count: number }
@@ -299,7 +300,7 @@ const AdminDashboard = () => {
             prize: prizeMap[s.prize_id] || '—',
             date: new Date(s.played_at).toLocaleDateString('pt-BR'),
             uniqueToken: token,
-            link: token && campSlug ? `https://roletadsaude.lovable.app/${campSlug}?token=${token}` : '',
+            link: token && campSlug ? campaignUrl(campSlug, token) : '',
           };
         });
 

@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Emoji, EmojiText } from '@/lib/twemoji';
+import { campaignUrl, campaignUrlLabel, publicHost } from '@/lib/campaign-url';
 import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -233,7 +234,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
   };
 
   const copySlugLink = () => {
-    navigator.clipboard.writeText(`https://roletadsaude.lovable.app/${form.slug}`);
+    navigator.clipboard.writeText(campaignUrl(form.slug));
     toast.success('Link copiado!');
   };
 
@@ -467,7 +468,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       const parts = (p.name || '').split(' ');
       const first = parts[0] || '';
       const last = parts.slice(1).join(' ') || '';
-      const link = `https://roletadsaude.lovable.app/${slug}?token=${p.unique_token}`;
+      const link = campaignUrl(slug, p.unique_token);
       return [p.email, last, first, p.phone, p.unique_token, link].join(';');
     });
     const csv = BOM + [header, ...rows].join('\n');
@@ -677,7 +678,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                   <div className="flex items-center gap-2">
                     <div className="flex items-center flex-1" style={{ ...inputStyle, padding: 0, display: 'flex' }}>
                       <span style={{ padding: '13px 0 13px 16px', color: '#9B8FAE', fontSize: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        roletadsaude.lovable.app/
+                        {publicHost()}/
                       </span>
                       <input
                         value={form.slug}
@@ -1104,7 +1105,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                     <div className="flex justify-between">
                       <span style={{ ...FONT, fontSize: 14, color: '#9B8FAE' }}>Link</span>
                       <span style={{ ...FONT, fontSize: 13, color: '#E8357A', fontFamily: 'monospace' }}>
-                        roletadsaude.lovable.app/{form.slug}
+                        {campaignUrlLabel(form.slug)}
                       </span>
                     </div>
                     <div className="flex justify-between">

@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { CloudUpload, FileText, ChevronDown, ChevronUp, RefreshCw, Download, AlertTriangle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { FONT } from '@/lib/admin-styles';
+import { campaignUrl } from '@/lib/campaign-url';
 
 export interface ParsedRow {
   name: string;
@@ -67,8 +68,7 @@ const CampaignParticipantImport = ({ onParsed, initialRows, savedTokens, slug }:
   const invalidCount = parsedRows.filter(r => r.status === 'invalid').length;
 
   const copyLink = (token: string) => {
-    const link = `https://roletadsaude.lovable.app/${slug}?token=${token}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(campaignUrl(slug, token));
     toast.success('Link copiado!');
   };
 
@@ -274,7 +274,7 @@ const CampaignParticipantImport = ({ onParsed, initialRows, savedTokens, slug }:
                                   onClick={() => copyLink(token)}
                                   className="flex items-center gap-1 transition-all hover:opacity-70"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E8357A', fontSize: 12, fontFamily: 'monospace', maxWidth: 220, ...FONT }}
-                                  title={`https://roletadsaude.lovable.app/${slug}?token=${token}`}
+                                  title={campaignUrl(slug, token)}
                                 >
                                   <Copy size={12} style={{ flexShrink: 0 }} />
                                   <span className="truncate">...{token.slice(-8)}</span>

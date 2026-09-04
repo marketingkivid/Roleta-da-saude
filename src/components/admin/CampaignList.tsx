@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Search, Pencil, Trash2, Link2, Zap, PauseCircle, ChevronLeft, ChevronRight, Copy, FileEdit, FlaskConical, Rocket } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Emoji } from '@/lib/twemoji';
+import { campaignUrl, campaignUrlLabel } from '@/lib/campaign-url';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -100,9 +101,7 @@ const CampaignList = ({ onEdit, onDuplicate }: CampaignListProps) => {
   };
 
   const copyLink = (c: typeof campaigns[0]) => {
-    const slug = c.slug || c.id;
-    const link = `https://roletadsaude.lovable.app/${slug}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(campaignUrl(c.slug || c.id));
     toast.success('Link copiado!');
   };
 
@@ -220,8 +219,8 @@ const CampaignList = ({ onEdit, onDuplicate }: CampaignListProps) => {
                       </Tooltip>
                     </div>
                     {c.slug && (
-                      <a href={`https://roletadsaude.lovable.app/${c.slug}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9B8FAE', fontFamily: 'monospace', textDecoration: 'none' }} className="hover:underline">
-                        roletadsaude.lovable.app/{c.slug}
+                      <a href={campaignUrl(c.slug)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#9B8FAE', fontFamily: 'monospace', textDecoration: 'none' }} className="hover:underline">
+                        {campaignUrlLabel(c.slug)}
                       </a>
                     )}
                   </div>
