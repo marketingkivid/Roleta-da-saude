@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { X, Plus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download, FlaskConical } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download, FlaskConical, Dices } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import PrizeImageUpload from './PrizeImageUpload';
@@ -90,6 +90,8 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
     mechanic: 'roleta' as const,
     active: true,
     is_test: false,
+    // Quantas vezes cada pessoa pode girar a roleta (para ao ganhar um prêmio).
+    spins_per_user: 1,
   });
 
 
@@ -126,6 +128,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
           mechanic: 'roleta',
           active: c.active,
           is_test: (c as any).is_test ?? false,
+          spins_per_user: Math.min(20, Math.max(1, Number(c.participation_limit) || 1)),
         });
 
         if (loadedSlug) {
@@ -294,7 +297,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       end_date: form.end_date.toISOString(),
       campaign_type: form.campaign_type,
       mechanic: form.mechanic,
-      participation_limit: 1,
+      participation_limit: Math.min(20, Math.max(1, Number(form.spins_per_user) || 1)),
       discount_percentage: 0,
       rules: '',
       active: form.active,
@@ -723,6 +726,109 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                   <label style={labelStyle}>Tipo de campanha</label>
                   <input value={form.campaign_type} onChange={e => update('campaign_type', e.target.value)} placeholder="Ex: GAMIFICACAO, CUPOM, SORTEIO" style={inputStyle} onFocus={focusHandler} onBlur={blurHandler} />
                 </div>
+
+                {/* Chances por pessoa — quantas vezes cada participante pode girar.
+                    A sequência PARA assim que a pessoa ganha um prêmio. */}
+                {(() => {
+                  const spins = Math.min(20, Math.max(1, Number(form.spins_per_user) || 1));
+                  const setSpins = (v: number) => update('spins_per_user', Math.min(20, Math.max(1, v)));
+                  const presets = [1, 2, 3, 5];
+                  return (
+                    <div
+                      style={{
+                        background: '#FDF2F8',
+                        border: '1.5px solid #F5C6E0',
+                        borderRadius: 16,
+                        padding: '16px 18px',
+                        ...FONT,
+                      }}
+                    >
+                      <div className="flex items-center gap-2" style={{ fontSize: 15, fontWeight: 800, color: '#9D1F6B' }}>
+                        <Dices size={16} />
+                        Chances por pessoa
+                      </div>
+                      <div style={{ fontSize: 13, color: '#B0568F', marginTop: 4, lineHeight: 1.45 }}>
+                        Quantas vezes cada participante pode girar a roleta. A vez dela{' '}
+                        <strong>termina assim que ganha um prêmio</strong> — se não ganhar, gira de novo até
+                        acabarem as chances.
+                      </div>
+
+                      <div className="flex items-center justify-center gap-4" style={{ marginTop: 14 }}>
+                        <button
+                          type="button"
+                          aria-label="Menos uma chance"
+                          onClick={() => setSpins(spins - 1)}
+                          disabled={spins <= 1}
+                          style={{
+                            width: 44, height: 44, borderRadius: 999, flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#FFFFFF', border: '1.5px solid #F5C6E0',
+                            color: spins <= 1 ? '#E0B6CE' : '#9D1F6B',
+                            cursor: spins <= 1 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <Minus size={18} />
+                        </button>
+
+                        <div className="flex flex-col items-center" style={{ minWidth: 92 }}>
+                          <span style={{ fontSize: 40, fontWeight: 900, color: '#9D1F6B', lineHeight: 1 }}>
+                            {spins}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#B0568F', marginTop: 2 }}>
+                            {spins === 1 ? 'chance' : 'chances'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          aria-label="Mais uma chance"
+                          onClick={() => setSpins(spins + 1)}
+                          disabled={spins >= 20}
+                          style={{
+                            width: 44, height: 44, borderRadius: 999, flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#FFFFFF', border: '1.5px solid #F5C6E0',
+                            color: spins >= 20 ? '#E0B6CE' : '#9D1F6B',
+                            cursor: spins >= 20 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2" style={{ marginTop: 12 }}>
+                        {presets.map(v => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setSpins(v)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 999,
+                              fontSize: 13, fontWeight: 800,
+                              border: `1.5px solid ${spins === v ? '#E8357A' : '#F5C6E0'}`,
+                              background: spins === v ? '#E8357A' : '#FFFFFF',
+                              color: spins === v ? '#FFFFFF' : '#9D1F6B',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 12, background: '#FFFFFF', borderRadius: 12,
+                          padding: '10px 14px', fontSize: 13, color: '#7A4A65', lineHeight: 1.45,
+                        }}
+                      >
+                        {spins === 1
+                          ? 'Cada pessoa gira uma única vez. Ganhando ou não, a participação encerra.'
+                          : <>Na roleta a pessoa vê <strong>“{spins} chances”</strong> e o contador diminui a cada giro. Se ganhar antes de zerar, a sequência para na hora.</>}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Campanha de teste — em destaque: cria e testa sem consumir
                     links reais nem entrar nos números das campanhas oficiais. */}

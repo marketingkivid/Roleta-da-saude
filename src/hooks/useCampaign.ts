@@ -40,6 +40,23 @@ export interface SpinResult {
     redeem_instructions: string;
     is_consolation: boolean;
   };
+  /** Qual tentativa é esta (1-based). */
+  attempt: number;
+  /** Total de chances configurado na campanha. */
+  maxAttempts: number;
+  /** Chances restantes DEPOIS desta. */
+  attemptsLeft: number;
+  /** Acabou (ganhou OU zerou as chances). */
+  finished: boolean;
+  /** Ganhou um prêmio real (não a consolação). */
+  won: boolean;
+}
+
+/** Estado de chances do jogador nesta campanha. */
+export interface AttemptsState {
+  used: number;
+  max: number;
+  left: number;
 }
 
 export function useCampaign(slug?: string) {
@@ -56,6 +73,8 @@ export function useCampaign(slug?: string) {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const [prefillData, setPrefillData] = useState<{ name: string; email: string; phone: string } | null>(null);
+  // Chances por pessoa nesta campanha (participation_limit) e quantas já usou.
+  const [attempts, setAttempts] = useState<AttemptsState>({ used: 0, max: 1, left: 1 });
   
 
   // lead_ref for roulette (token-based or session uuid)
@@ -91,6 +110,27 @@ export function useCampaign(slug?: string) {
     }
   };
 
+  // Payload de prêmio do spin-roulette → objeto Prize completo.
+  const buildPrize = (p: SpinResult['prize']): Prize => ({
+    id: p.id,
+    name: p.name,
+    emoji: p.emoji,
+    description: p.description,
+    image_url: p.image_url,
+    checkout_url: p.checkout_url,
+    redeem_instructions: p.redeem_instructions,
+    is_consolation: p.is_consolation,
+    weight: 1,
+    probability: 0,
+    quantity_available: null,
+    quantity_distributed: 0,
+    active: true,
+    campaign_id: campaignId ?? undefined,
+    created_at: '',
+    color_token: null,
+    display_order: 0,
+  } as unknown as Prize);
+
 
   // Resolve campaign from slug
   useEffect(() => {
@@ -100,18 +140,46 @@ export function useCampaign(slug?: string) {
       return;
     }
 
+    // Consulta o estado de chances do jogador no servidor (fonte da verdade).
+    // Usado ao retomar a roleta depois de recarregar a página.
+    const resumeState = async (campId: string, lead: ParticipantData | null) => {
+      try {
+        const device_id = await getDeviceId().catch(() => undefined);
+        const { data } = await supabase.functions.invoke('spin-roulette', {
+          body: {
+            campaign_id: campId,
+            lead_ref: leadRefRef.current,
+            device_id,
+            email: lead?.email || undefined,
+            check_only: true,
+          },
+        });
+        return data as {
+          check_only?: boolean; already_spun?: boolean;
+          finished?: boolean; won?: boolean;
+          maxAttempts?: number; attemptsUsed?: number; attemptsLeft?: number;
+          prize?: SpinResult['prize'];
+        } | null;
+      } catch {
+        return null;
+      }
+    };
+
     const loadCampaign = async () => {
       const { data } = await supabase
         .from('campaigns')
-        .select('id, active, end_date, has_participant_list, mechanic, is_test')
+        .select('id, active, end_date, has_participant_list, mechanic, is_test, participation_limit')
         .eq('slug', slug)
-        .single() as { data: { id: string; active: boolean; end_date: string; has_participant_list: boolean; mechanic: string; is_test: boolean } | null; error: any };
+        .single() as { data: { id: string; active: boolean; end_date: string; has_participant_list: boolean; mechanic: string; is_test: boolean; participation_limit: number | null } | null; error: any };
 
       if (!data) {
         setStep('not_found');
         setCampaignLoaded(true);
         return;
       }
+
+      const maxAttempts = Math.min(20, Math.max(1, Number(data.participation_limit) || 1));
+      setAttempts({ used: 0, max: maxAttempts, left: maxAttempts });
 
       if (!data.active || (data.end_date && new Date(data.end_date) < new Date())) {
         setStep('inactive');
@@ -177,16 +245,16 @@ export function useCampaign(slug?: string) {
           phone: res.phone || '',
         });
 
-        // Já girou este link → giro gasto → "Você já veio por aqui".
+        // Já finalizou (localStorage) → "Você já veio por aqui".
         if (restoreSpunPrize(data.id)) {
           setStep('already_played');
           return;
         }
-        // Já preencheu o formulário mas ainda não girou → retoma direto na roleta.
+        // Já preencheu o formulário → confere o estado de chances no servidor.
         const lead = restoreLead(data.id);
         if (lead) {
           setParticipantData(lead);
-          setStep('game');
+          await routeResume(data.id, lead, maxAttempts, isTest);
           return;
         }
 
@@ -205,19 +273,36 @@ export function useCampaign(slug?: string) {
       leadRefRef.current = ref;
 
       if (typeof window !== 'undefined' && (restoreSpunPrize(data.id) || localStorage.getItem(playedStorageKey(data.id)))) {
-        // Giro já usado neste link → "Você já veio por aqui".
+        // Já finalizou (localStorage) → "Você já veio por aqui".
         setStep('already_played');
       } else {
-        // Formulário já enviado mas ainda não girou → retoma direto na roleta.
         const lead = restoreLead(data.id);
         if (lead) {
           setParticipantData(lead);
-          setStep('game');
+          // Confere no servidor quantas chances o jogador já usou.
+          await routeResume(data.id, lead, maxAttempts, isTest);
         } else {
           setStep('landing');
         }
       }
 
+    };
+
+    // Retoma na roleta com o estado de chances correto (fonte: servidor).
+    const routeResume = async (campId: string, lead: ParticipantData, maxAttempts: number, testCampaign: boolean) => {
+      if (testCampaign) { setStep('game'); return; } // teste: sempre recomeça
+      const s = await resumeState(campId, lead);
+      if (s?.finished && s.prize) {
+        setPrize(buildPrize(s.prize));
+        setAttempts({ used: s.attemptsUsed ?? maxAttempts, max: s.maxAttempts ?? maxAttempts, left: 0 });
+        try { localStorage.setItem(spunStorageKey(campId), JSON.stringify(buildPrize(s.prize))); } catch { /* noop */ }
+        setStep(s.won ? 'reward' : 'consolation');
+        return;
+      }
+      const used = s?.attemptsUsed ?? 0;
+      const max = s?.maxAttempts ?? maxAttempts;
+      setAttempts({ used, max, left: Math.max(0, max - used) });
+      setStep('game');
     };
 
     loadCampaign();
@@ -308,36 +393,23 @@ export function useCampaign(slug?: string) {
       console.error('spin-roulette error', error || data?.error);
       return null;
     }
-    return data as SpinResult;
+    const result = data as SpinResult;
+    // Atualiza o contador de chances a cada giro.
+    setAttempts({
+      used: result.attempt,
+      max: result.maxAttempts,
+      left: result.attemptsLeft,
+    });
+    return result;
   }, [campaignId, participantData.email]);
 
-  // Chamado quando a roleta para e o modal é dispensado. Registra a participação
-  // com o prêmio sorteado e leva para a tela de resultado (recompensa/consolação).
+  // Chamado quando a roleta PARA e a participação está encerrada (ganhou ou
+  // zerou as chances). Registra a participação e leva à tela de resultado.
   const finalizeRouletteResult = useCallback(async (spinResult: SpinResult) => {
-    const { prize: p } = spinResult;
-    const won: Prize = {
-      id: p.id,
-      name: p.name,
-      emoji: p.emoji,
-      description: p.description,
-      image_url: p.image_url,
-      checkout_url: p.checkout_url,
-      redeem_instructions: p.redeem_instructions,
-      is_consolation: p.is_consolation,
-      weight: 1,
-      probability: 0,
-      quantity_available: null,
-      quantity_distributed: 0,
-      active: true,
-      campaign_id: campaignId ?? undefined,
-      created_at: '',
-      color_token: null,
-      display_order: 0,
-    } as unknown as Prize;
-
+    const won = buildPrize(spinResult.prize);
     setPrize(won);
 
-    // Marca o giro como usado — este link não gira mais (reabrir → "já veio").
+    // Marca como finalizado — reabrir a campanha cai em "já veio por aqui".
     if (campaignId && typeof window !== 'undefined') {
       try {
         localStorage.setItem(spunStorageKey(campaignId), JSON.stringify(won));
@@ -345,7 +417,7 @@ export function useCampaign(slug?: string) {
       } catch { /* noop */ }
     }
 
-    // Registra a participação com o prêmio (o lead já foi criado no formulário).
+    // Uma única participação por pessoa (o prêmio final: vitória ou consolação).
     await supabase.from('participations').insert({
       name: participantData.name,
       email: participantData.email,
@@ -358,7 +430,7 @@ export function useCampaign(slug?: string) {
       await supabase.rpc('mark_participant_played', { p_participant_id: participantId });
     }
 
-    setStep(won.is_consolation ? 'consolation' : 'reward');
+    setStep(spinResult.won ? 'reward' : 'consolation');
   }, [campaignId, participantData, participantId]);
 
   // Sem "resetar campanha": um giro por acesso é definitivo. Campanhas de teste
@@ -380,5 +452,6 @@ export function useCampaign(slug?: string) {
     campaignId,
     spinRoulette,
     finalizeRouletteResult,
+    attempts,
   };
 }

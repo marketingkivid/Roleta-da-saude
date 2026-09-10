@@ -44,6 +44,7 @@ const Index = () => {
     campaignId,
     spinRoulette,
     finalizeRouletteResult,
+    attempts,
   } = useCampaign(slug);
 
   // Loading state
@@ -212,6 +213,7 @@ const Index = () => {
               campaignId={campaignId}
               onSpin={spinRoulette}
               onFinish={finalizeRouletteResult}
+              attempts={attempts}
             />
           )}
           {(step === 'reward' || step === 'consolation') && prize && (

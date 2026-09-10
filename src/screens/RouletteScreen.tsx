@@ -23,8 +23,10 @@ const CONSOLATION_WHEEL_LABEL = 'Não foi dessa vez';
 interface RouletteScreenProps {
   campaignId: string;
   onSpin: () => Promise<SpinResult | null>;
-  /** Chamado quando o modal de resultado é dispensado (botão, ×, ESC ou backdrop). */
+  /** Chamado quando a participação encerra (ganhou ou zerou as chances). */
   onFinish: (result: SpinResult) => Promise<void>;
+  /** Chances desta pessoa na campanha (usadas / total / restantes). */
+  attempts: { used: number; max: number; left: number };
 }
 
 // Kivid DS — família Pitaya sobre branco Kivid
@@ -101,12 +103,14 @@ const CoinRain = () => {
   );
 };
 
-const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) => {
+const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScreenProps) => {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [rotation, setRotation] = useState(0);
   const [spinState, setSpinState] = useState<'idle' | 'requesting' | 'spinning' | 'landed'>('idle');
   const [revealPrize, setRevealPrize] = useState<SpinResult['prize'] | null>(null);
+  // Resultado completo do último giro (traz o estado de tentativas).
+  const [lastResult, setLastResult] = useState<SpinResult | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const tooltipTimerRef = useRef<number | null>(null);
   const wheelRef = useRef<SVGSVGElement | null>(null);
@@ -115,6 +119,11 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const hapticTimersRef = useRef<number[]>([]);
+  // Chances restantes "congeladas" no instante em que o giro começa.
+  const chancesBeforeSpinRef = useRef<number>(attempts.left);
+  useEffect(() => {
+    if (spinState === 'idle') chancesBeforeSpinRef.current = attempts.left;
+  }, [attempts.left, spinState]);
 
   // ── Sensação tátil ────────────────────────────────────────────────────────
   // Android/Chrome: Vibration API real.
@@ -397,6 +406,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
     const landId = window.setTimeout(() => {
       setSpinState('landed');
       setRevealPrize(result.prize);
+      setLastResult(result);
       // Buzz de parada — crescendo comemorativo (prêmio) ou pulso duplo (consolação).
       if (result.prize.is_consolation) {
         feel([60, 60, 80], { freq: 70, duration: 0.14, gain: 0.35 });
@@ -416,17 +426,49 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
 
 
 
+  // O modal encerrou e a participação acabou (ganhou OU zerou as chances).
   const handleContinue = async () => {
-    if (!revealPrize) return;
-    // Reconstruct SpinResult for onFinish (segmentIndex already animated to)
-    // We stored revealPrize; onFinish just needs the prize + index bundle.
-    // Rebuild minimal SpinResult from state.
-    await onFinish({
-      segmentIndex: 0, // no longer needed downstream, but kept for type
-      totalSegments: segments.length,
-      prize: revealPrize,
-    });
+    if (!lastResult) return;
+    await onFinish(lastResult);
   };
+
+  // "Girar de novo" — ainda tem chances e não ganhou. Reinicia o modal e gira.
+  const handleSpinAgain = () => {
+    setSpinState('idle');
+    setRevealPrize(null);
+    setLastResult(null);
+    // pequeno atraso para o modal fechar antes do próximo giro
+    window.setTimeout(() => { void handleSpin(); }, 60);
+  };
+
+  // O último giro encerrou a participação (ganhou OU zerou as chances)?
+  const spinFinished = lastResult?.finished ?? true;
+  // Consolação com chances sobrando → oferece girar de novo dentro do modal.
+  const canRetry = !spinFinished && !!lastResult && !lastResult.won;
+  const retryLeft = lastResult?.attemptsLeft ?? attempts.left;
+
+  // Dispensar o modal (×, ESC, backdrop):
+  //  - participação encerrada → segue para a tela de resultado;
+  //  - ainda tem chance → volta para a roleta, pronta para o próximo giro
+  //    (o giro em si é disparado pelo botão "Girar de novo", nunca por engano).
+  const dismissModal = () => {
+    if (spinFinished) {
+      void handleContinue();
+      return;
+    }
+    setSpinState('idle');
+    setRevealPrize(null);
+    setLastResult(null);
+  };
+
+  // Contador de chances mostrado no topo da roleta.
+  // Enquanto a roda gira, mantém o número de antes do giro (o resultado ainda
+  // não "consumiu" a chance visualmente); ao parar, mostra o que sobrou.
+  const totalChances = Math.max(1, attempts.max);
+  const chancesLeft =
+    spinState === 'landed' && lastResult ? lastResult.attemptsLeft : chancesBeforeSpinRef.current;
+  const multiChance = totalChances > 1;
+  const showChanceDots = multiChance && totalChances <= 8;
 
   // Show the full prize name on tap/hover. Positioned relative to the wheel wrapper
   // so it never affects the SVG text layout inside the slice.
@@ -515,7 +557,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        void handleContinue();
+        dismissModal();
         return;
       }
       if (e.key === 'Tab') {
@@ -636,6 +678,45 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
         <h1 className="text-lg sm:text-3xl mt-0 sm:mt-1" style={{ color: PURPLE_DEEP, fontWeight: 900, lineHeight: 1.1 }}>
           Gire e ganhe seu prêmio
         </h1>
+
+        {multiChance && (
+          <div
+            className="mt-1.5 sm:mt-2 inline-flex items-center gap-2 rounded-full"
+            style={{
+              background: PITAYA_100,
+              color: PURPLE_DEEP,
+              padding: '5px 12px',
+              fontWeight: 900,
+              fontSize: 12.5,
+              letterSpacing: 0.2,
+            }}
+            aria-label={`Você tem ${chancesLeft} de ${totalChances} chances`}
+          >
+            <Emoji emoji="🍀" label="" size={15} />
+            <span>
+              {chancesLeft > 0
+                ? <>{chancesLeft} {chancesLeft === 1 ? 'chance' : 'chances'} <span style={{ opacity: 0.6, fontWeight: 800 }}>de {totalChances}</span></>
+                : <>chances esgotadas</>}
+            </span>
+            {showChanceDots && (
+              <span className="flex items-center gap-1" aria-hidden="true">
+                {Array.from({ length: totalChances }).map((_, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      display: 'inline-block',
+                      background: i < chancesLeft ? PITAYA_600 : 'rgba(148, 41, 113, 0.22)',
+                      transition: 'background-color 240ms ease',
+                    }}
+                  />
+                ))}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
 
@@ -997,7 +1078,13 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
         </button>
         {spinState === 'idle' && (
           <p className="text-xs sm:text-base text-center" style={{ color: PURPLE, fontWeight: 600 }}>
-            Toque em girar. Você só tem uma chance!
+            {!multiChance
+              ? 'Toque em girar. Você só tem uma chance!'
+              : chancesLeft >= totalChances
+                ? <EmojiText>{`Toque em girar. São ${totalChances} chances até você levar um prêmio! 🍀`}</EmojiText>
+                : chancesLeft > 0
+                  ? <EmojiText>{`Ainda dá! ${chancesLeft === 1 ? 'Falta 1 chance' : `Faltam ${chancesLeft} chances`}. Vai que é dessa vez! 🍀`}</EmojiText>
+                  : 'Suas chances acabaram por aqui.'}
           </p>
         )}
       </div>
@@ -1010,7 +1097,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
           style={{ background: 'rgba(94, 15, 63, 0.85)' }}
           onClick={(e) => {
             // Fechar pelo backdrop → segue para a tela de resultado.
-            if (e.target === e.currentTarget) void handleContinue();
+            if (e.target === e.currentTarget) dismissModal();
           }}
         >
           <div
@@ -1035,7 +1122,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
             <button
               ref={closeBtnRef}
               type="button"
-              onClick={() => void handleContinue()}
+              onClick={() => dismissModal()}
               aria-label="Fechar"
               className="kv-btn"
               style={{
@@ -1099,7 +1186,9 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
 
             {revealPrize.is_consolation ? (
               <p id="kv-reveal-desc" className="text-[15px] sm:text-sm" style={{ color: '#6B4B7A', marginBottom: 20, lineHeight: 1.45 }}>
-                <EmojiText>Não foi dessa vez — mas cada giro conta. Veja o que a gente preparou pra você. 💜</EmojiText>
+                {canRetry
+                  ? <EmojiText>{`Essa não veio — mas você ainda tem ${retryLeft === 1 ? '1 chance' : `${retryLeft} chances`}. Bora de novo? 💜`}</EmojiText>
+                  : <EmojiText>Não foi dessa vez — mas cada giro conta. Veja o que a gente preparou pra você. 💜</EmojiText>}
               </p>
             ) : (
               revealPrize.description ? (
@@ -1114,7 +1203,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
 
             <button
               type="button"
-              onClick={handleContinue}
+              onClick={canRetry ? handleSpinAgain : handleContinue}
               className="kv-btn kv-btn-continue w-full"
               style={{
                 border: 'none',
@@ -1128,12 +1217,18 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish }: RouletteScreenProps) =
                 minHeight: 60,
               }}
             >
-              {revealPrize.is_consolation ? 'Continuar →' : 'Pegar meu prêmio →'}
+              {canRetry
+                ? 'Girar de novo →'
+                : revealPrize.is_consolation
+                  ? 'Continuar →'
+                  : 'Pegar meu prêmio →'}
             </button>
             <p className="text-[13px]" style={{ color: '#8A6BA0', marginTop: 10 }}>
-              {revealPrize.is_consolation
-                ? <EmojiText>A próxima roleta pode ter o prêmio que você quer. ✨</EmojiText>
-                : 'Falta só um passo para resgatar.'}
+              {canRetry
+                ? <EmojiText>{`${retryLeft === 1 ? 'Última chance' : `Você ainda tem ${retryLeft} chances`} — cada giro pode ser o da sorte! ✨`}</EmojiText>
+                : revealPrize.is_consolation
+                  ? <EmojiText>A próxima roleta pode ter o prêmio que você quer. ✨</EmojiText>
+                  : 'Falta só um passo para resgatar.'}
             </p>
           </div>
         </div>

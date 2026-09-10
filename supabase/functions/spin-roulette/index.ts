@@ -12,6 +12,8 @@ const BodySchema = z.object({
   lead_ref: z.string().min(1).max(200),
   device_id: z.string().min(1).max(200).optional(),
   email: z.string().email().max(320).optional(),
+  // Só consulta o estado de tentativas — não sorteia.
+  check_only: z.boolean().optional(),
 });
 
 /** IP do cliente a partir dos headers do edge runtime. */
@@ -30,14 +32,28 @@ function safeForOr(v: string | null): string | null {
   return v && /^[A-Za-z0-9._:%-]{1,200}$/.test(v) ? v : null;
 }
 
-/** Resposta padrão "já girou": devolve o mesmo prêmio, sem sortear de novo. */
-function alreadySpun(prev: PrizeRow, segments: WheelSegment[], corsHeaders: Record<string, string>) {
+interface AttemptInfo {
+  attempt: number;        // qual tentativa é esta (1-based)
+  maxAttempts: number;    // total de chances configurado na campanha
+  attemptsLeft: number;   // chances restantes DEPOIS desta
+  finished: boolean;      // acabou (ganhou OU zerou as chances)
+  won: boolean;           // ganhou um prêmio real (não a consolação)
+}
+
+function spinResponse(
+  prize: PrizeRow,
+  segments: WheelSegment[],
+  info: AttemptInfo,
+  corsHeaders: Record<string, string>,
+  extra: Record<string, unknown> = {},
+) {
   return new Response(
     JSON.stringify({
-      segmentIndex: pickSegmentIndex(segments, prev.id),
+      segmentIndex: pickSegmentIndex(segments, prize.id),
       totalSegments: segments.length,
-      prize: prizePayload(prev),
-      already_spun: true,
+      prize: prizePayload(prize),
+      ...info,
+      ...extra,
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
@@ -154,13 +170,18 @@ Deno.serve(async (req) => {
     const { campaign_id, lead_ref } = parsed.data;
     const device_id = parsed.data.device_id ?? null;
     const email = parsed.data.email?.trim().toLowerCase() ?? null;
+    const checkOnly = parsed.data.check_only === true;
     const client_ip = clientIp(req);
 
-    const { data: campaign, error: cErr } = await supabase
+    const { data: campaignRow, error: cErr } = await supabase
       .from("campaigns")
-      .select("id, active, mechanic, has_participant_list, is_test")
+      .select("id, active, mechanic, has_participant_list, is_test, participation_limit")
       .eq("id", campaign_id)
       .maybeSingle();
+    const campaign = campaignRow as {
+      id: string; active: boolean; mechanic: string;
+      has_participant_list: boolean; is_test: boolean; participation_limit: number | null;
+    } | null;
 
     if (cErr || !campaign) {
       return new Response(JSON.stringify({ error: "campaign_not_found" }), {
@@ -203,53 +224,40 @@ Deno.serve(async (req) => {
       });
     }
     const segments = segmentsData as WheelSegment[];
+    const prizeById = (id: string) => (prizes as PrizeRow[]).find((p) => p.id === id);
 
-    // -- Token-based (list) campaign: enforce 1 spin per token, idempotent --
+    // Chances por pessoa (participation_limit). null/0 → 1.
+    const maxAttempts = Math.min(20, Math.max(1, Number(campaign.participation_limit) || 1));
+    const isTest = !!campaign.is_test;
+
+    // -- Token (campanha com lista): valida o token --
     let participantId: string | null = null;
     if (campaign.has_participant_list) {
       const { data: participant } = await supabase
         .from("campaign_participants")
-        .select("id, spun_at, spun_prize_id")
+        .select("id")
         .eq("campaign_id", campaign_id)
         .eq("unique_token", lead_ref)
         .maybeSingle();
-
       if (!participant) {
         return new Response(JSON.stringify({ error: "invalid_token" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
       participantId = participant.id;
-
-      // Already spun → return the same prize (idempotent). Prevents reroll on refresh.
-      if (participant.spun_at && participant.spun_prize_id) {
-        const prev = (prizes as PrizeRow[]).find(p => p.id === participant.spun_prize_id);
-        if (prev) {
-          const segmentIndex = pickSegmentIndex(segments, prev.id);
-          return new Response(
-            JSON.stringify({
-              segmentIndex,
-              totalSegments: segments.length,
-              prize: prizePayload(prev),
-              already_spun: true,
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
     }
 
-    // -- Blindagem do giro único (campanhas reais, não-teste) --
-    //   lead_ref (sessão) · device_id (impressão digital) · client_ip
-    //   Vale para campanha aberta E com lista: se qualquer sinal já girou nesta
-    //   campanha, devolve o mesmo prêmio e não sorteia de novo.
-    const isTest = !!(campaign as any).is_test;
+    // -- Estado das tentativas deste usuário (campanhas reais) --
+    //   Conta os giros já feitos por lead_ref / device_id / IP e detecta se
+    //   algum foi vitória. Vale para campanha aberta E com lista.
+    let attemptsUsed = 0;
+    let priorWin: PrizeRow | null = null;
+    let lastPrize: PrizeRow | null = null;
+
     if (!isTest) {
       const safeLead = safeForOr(lead_ref);
       const safeDevice = safeForOr(device_id);
       const safeIp = safeForOr(client_ip);
-
       const orParts: string[] = [];
       if (safeLead) orParts.push(`lead_ref.eq.${safeLead}`);
       if (safeDevice) orParts.push(`device_id.eq.${safeDevice}`);
@@ -258,42 +266,72 @@ Deno.serve(async (req) => {
       const { data: priorSpins } = orParts.length
         ? await supabase
             .from("campaign_spins")
-            .select("prize_id, lead_ref, device_id, client_ip")
+            .select("prize_id, lead_ref, device_id, client_ip, spun_at")
             .eq("campaign_id", campaign_id)
             .or(orParts.join(","))
-            .limit(10)
-        : { data: [] as { prize_id: string; lead_ref: string; device_id: string | null; client_ip: string | null }[] };
+            .order("spun_at", { ascending: true })
+            .limit(50)
+        : { data: [] as { prize_id: string; lead_ref: string; device_id: string | null; client_ip: string | null; spun_at: string }[] };
 
       const rows = priorSpins ?? [];
-      const blocker =
-        rows.find((s) => s.lead_ref === lead_ref) ||
-        (safeDevice ? rows.find((s) => s.device_id === device_id) : undefined) ||
-        // IP só bloqueia quando não temos impressão digital (evita falso
-        // positivo em redes compartilhadas / operadora móvel).
-        (!device_id && client_ip ? rows.find((s) => s.client_ip === client_ip) : undefined);
+      // "Meus" giros: bate device_id (forte) ou lead_ref. Sem device_id, cai
+      // no IP (mais frouxo, mas melhor que deixar rolar).
+      const mine = device_id
+        ? rows.filter((s) => s.device_id === device_id || s.lead_ref === lead_ref)
+        : rows.filter((s) => s.lead_ref === lead_ref || (client_ip && s.client_ip === client_ip));
 
-      if (blocker?.prize_id) {
-        const prev = (prizes as PrizeRow[]).find((p) => p.id === blocker.prize_id);
-        if (prev) return alreadySpun(prev, segments, corsHeaders);
+      attemptsUsed = mine.length;
+      for (const s of mine) {
+        const pr = prizeById(s.prize_id);
+        if (pr) {
+          lastPrize = pr;
+          if (!pr.is_consolation) priorWin = pr;
+        }
       }
 
-      // Bloqueio por e-mail: mesmo e-mail não participa 2× nesta campanha
-      // (mesmo de outro navegador/dispositivo).
-      if (email) {
-        const { data: priorByEmail } = await supabase
+      // Já participou com este e-mail (mesmo de outro dispositivo)?
+      if (!priorWin && email) {
+        const { data: byEmail } = await supabase
           .from("participations")
           .select("prize_id")
           .eq("campaign_id", campaign_id)
           .eq("email", email)
           .limit(1);
-        const prizeId = priorByEmail?.[0]?.prize_id;
-        if (prizeId) {
-          const prev = (prizes as PrizeRow[]).find((p) => p.id === prizeId);
-          if (prev) return alreadySpun(prev, segments, corsHeaders);
+        const pid = byEmail?.[0]?.prize_id;
+        const pr = pid ? prizeById(pid) : undefined;
+        if (pr) {
+          lastPrize = pr;
+          if (!pr.is_consolation) priorWin = pr;
+          attemptsUsed = Math.max(attemptsUsed, maxAttempts); // trava
         }
       }
     }
 
+    // -- Já terminou? (ganhou antes OU zerou as chances) --
+    const alreadyFinished = !!priorWin || (!isTest && attemptsUsed >= maxAttempts);
+    if (alreadyFinished && lastPrize) {
+      return spinResponse(lastPrize, segments, {
+        attempt: attemptsUsed,
+        maxAttempts,
+        attemptsLeft: 0,
+        finished: true,
+        won: !!priorWin,
+      }, corsHeaders, { already_spun: true });
+    }
+
+    // -- check_only: só reporta o estado, sem sortear --
+    if (checkOnly) {
+      return new Response(JSON.stringify({
+        check_only: true,
+        maxAttempts,
+        attemptsUsed,
+        attemptsLeft: Math.max(0, maxAttempts - attemptsUsed),
+        finished: false,
+        won: false,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // -- Sorteia esta tentativa --
     const winner = drawWeighted(prizes as PrizeRow[]);
     if (!winner) {
       return new Response(JSON.stringify({ error: "out_of_stock" }), {
@@ -301,10 +339,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const segmentIndex = pickSegmentIndex(segments, winner.id);
+    const attempt = attemptsUsed + 1;
+    const won = !winner.is_consolation;
+    // Ganhou → para. Perdeu → resta (max - attempt).
+    const attemptsLeft = won ? 0 : Math.max(0, maxAttempts - attempt);
+    const finished = won || attemptsLeft === 0;
 
-    // Persist spin immediately so the token can never spin again.
-    if (participantId) {
+    // Registra o giro (device_id + IP) — em campanha real de qualquer tipo.
+    if (!isTest) {
+      await supabase
+        .from("campaign_spins")
+        .insert({ campaign_id, lead_ref, prize_id: winner.id, device_id, client_ip });
+    }
+
+    // Campanha com lista: marca o participante ao TERMINAR (ganhou ou zerou).
+    if (participantId && finished) {
       await supabase
         .from("campaign_participants")
         .update({
@@ -313,32 +362,14 @@ Deno.serve(async (req) => {
           played: true,
           token_used_at: new Date().toISOString(),
         })
-        .eq("id", participantId)
-        .is("spun_at", null); // race-safe: only if not already spun
-    }
-
-    // Registra o giro (campanha aberta E com lista) com device_id + IP, para
-    // que nem limpar o navegador nem trocar de e-mail permita girar de novo.
-    if (!isTest) {
-      await supabase
-        .from("campaign_spins")
-        .insert({ campaign_id, lead_ref, prize_id: winner.id, device_id, client_ip })
-        .select()
-        .maybeSingle();
+        .eq("id", participantId);
     }
 
     console.log("[spin-roulette] draw", {
-      campaign_id, lead_ref, prize_id: winner.id, segmentIndex, totalSegments: segments.length,
+      campaign_id, prize_id: winner.id, attempt, maxAttempts, won, finished,
     });
 
-    return new Response(
-      JSON.stringify({
-        segmentIndex,
-        totalSegments: segments.length,
-        prize: prizePayload(winner),
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return spinResponse(winner, segments, { attempt, maxAttempts, attemptsLeft, finished, won }, corsHeaders);
   } catch (e) {
     console.error("[spin-roulette] fatal", e);
     return new Response(JSON.stringify({ error: String((e as any)?.message || e) }), {
