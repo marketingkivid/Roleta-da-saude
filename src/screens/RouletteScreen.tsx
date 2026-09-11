@@ -344,17 +344,19 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // Mobile-first: usa quase toda a largura da tela; em telas maiores mantém limite confortável.
-  const horizontalPadding = viewportW < 400 ? 24 : viewportW < 640 ? 32 : 48;
+  const horizontalPadding = viewportW < 400 ? 8 : viewportW < 640 ? 14 : 48;
   const sizeByWidth = Math.max(240, viewportW - horizontalPadding);
   // Reserva vertical para header + progressbar + título + botão + paddings.
   // Assim o CTA fica visível sem rolar em telas pequenas.
   const isMobile = viewportW < 640;
   // Reserva vertical p/ header + progressbar + título + ponteiro + CTA + microcopy.
   // Cresce em telas curtas para o CTA ficar visível sem rolar e o ponteiro não
-  // encostar no título (iPhone SE / navegadores com barra grande).
-  const chromeReserve = viewportH < 720 ? 372 : viewportH < 820 ? 324 : 300;
+  // encostar no título (iPhone SE / navegadores com barra grande). Quando a
+  // campanha tem mais de 1 chance, o badge de tentativas soma uma linha extra.
+  const multiChanceReserve = attempts.max > 1 ? 24 : 0;
+  const chromeReserve = (viewportH < 720 ? 316 : viewportH < 820 ? 278 : 300) + multiChanceReserve;
   const sizeByHeight = Math.max(220, viewportH - chromeReserve);
-  const size = Math.min(520, sizeByWidth, sizeByHeight);
+  const size = Math.min(560, sizeByWidth, sizeByHeight);
 
   const cx = size / 2;
   const cy = size / 2;
