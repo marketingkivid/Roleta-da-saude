@@ -26,10 +26,10 @@ function clientIp(req: Request): string | null {
 /**
  * Só usa o valor num filtro PostgREST `.or()` se for seguro (sem vírgula,
  * parênteses ou aspas que poderiam alterar a query). Nossos valores legítimos
- * (uuid, hash sha256, IP) passam; lixo de header é descartado.
+ * (uuid, hash sha256, IP, e-mail) passam; lixo de header é descartado.
  */
 function safeForOr(v: string | null): string | null {
-  return v && /^[A-Za-z0-9._:%-]{1,200}$/.test(v) ? v : null;
+  return v && /^[A-Za-z0-9._:%+@-]{1,200}$/.test(v) ? v : null;
 }
 
 interface AttemptInfo {
@@ -248,8 +248,13 @@ Deno.serve(async (req) => {
     }
 
     // -- Estado das tentativas deste usuário (campanhas reais) --
-    //   Conta os giros já feitos por lead_ref / device_id / IP e detecta se
-    //   algum foi vitória. Vale para campanha aberta E com lista.
+    //   Conta os giros já feitos por lead_ref / device_id / e-mail / IP e
+    //   detecta se algum foi vitória. Vale para campanha aberta E com lista.
+    //   O e-mail é o que garante a regra entre APARELHOS DIFERENTES: se a
+    //   mesma pessoa abre o link no computador e depois no celular com o
+    //   mesmo e-mail, lead_ref e device_id não batem (são por aparelho) —
+    //   só o e-mail identifica que é a mesma pessoa, então ele conta desde
+    //   o primeiro giro, não só quando a participação termina.
     let attemptsUsed = 0;
     let priorWin: PrizeRow | null = null;
     let lastPrize: PrizeRow | null = null;
@@ -258,27 +263,38 @@ Deno.serve(async (req) => {
       const safeLead = safeForOr(lead_ref);
       const safeDevice = safeForOr(device_id);
       const safeIp = safeForOr(client_ip);
+      const safeEmail = safeForOr(email);
       const orParts: string[] = [];
       if (safeLead) orParts.push(`lead_ref.eq.${safeLead}`);
       if (safeDevice) orParts.push(`device_id.eq.${safeDevice}`);
+      if (safeEmail) orParts.push(`email.eq.${safeEmail}`);
       if (safeIp) orParts.push(`client_ip.eq.${safeIp}`);
 
       const { data: priorSpins } = orParts.length
         ? await supabase
             .from("campaign_spins")
-            .select("prize_id, lead_ref, device_id, client_ip, spun_at")
+            .select("prize_id, lead_ref, device_id, client_ip, email, spun_at")
             .eq("campaign_id", campaign_id)
             .or(orParts.join(","))
             .order("spun_at", { ascending: true })
             .limit(50)
-        : { data: [] as { prize_id: string; lead_ref: string; device_id: string | null; client_ip: string | null; spun_at: string }[] };
+        : {
+            data: [] as {
+              prize_id: string; lead_ref: string; device_id: string | null;
+              client_ip: string | null; email: string | null; spun_at: string;
+            }[],
+          };
 
       const rows = priorSpins ?? [];
-      // "Meus" giros: bate device_id (forte) ou lead_ref. Sem device_id, cai
-      // no IP (mais frouxo, mas melhor que deixar rolar).
-      const mine = device_id
-        ? rows.filter((s) => s.device_id === device_id || s.lead_ref === lead_ref)
-        : rows.filter((s) => s.lead_ref === lead_ref || (client_ip && s.client_ip === client_ip));
+      // "Meus" giros: bate device_id OU lead_ref (mesmo aparelho) OU e-mail
+      // (mesma pessoa, qualquer aparelho). IP só entra quando não há
+      // device_id — sozinho é frouxo demais (rede compartilhada).
+      const mine = rows.filter((s) =>
+        (!!device_id && s.device_id === device_id) ||
+        s.lead_ref === lead_ref ||
+        (!!email && s.email === email) ||
+        (!device_id && !!client_ip && s.client_ip === client_ip)
+      );
 
       attemptsUsed = mine.length;
       for (const s of mine) {
@@ -289,7 +305,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Já participou com este e-mail (mesmo de outro dispositivo)?
+      // Segunda camada (defesa extra): já existe uma participação FINALIZADA
+      // com este e-mail? Cobre o caso de dados antigos sem device_id/email
+      // gravado no giro.
       if (!priorWin && email) {
         const { data: byEmail } = await supabase
           .from("participations")
@@ -345,11 +363,13 @@ Deno.serve(async (req) => {
     const attemptsLeft = won ? 0 : Math.max(0, maxAttempts - attempt);
     const finished = won || attemptsLeft === 0;
 
-    // Registra o giro (device_id + IP) — em campanha real de qualquer tipo.
+    // Registra o giro (device_id + e-mail + IP) — em campanha real de
+    // qualquer tipo. O e-mail vai em TODO giro (não só no final) para a
+    // regra valer desde a primeira tentativa em qualquer aparelho.
     if (!isTest) {
       await supabase
         .from("campaign_spins")
-        .insert({ campaign_id, lead_ref, prize_id: winner.id, device_id, client_ip });
+        .insert({ campaign_id, lead_ref, prize_id: winner.id, device_id, client_ip, email });
     }
 
     // Campanha com lista: marca o participante ao TERMINAR (ganhou ou zerou).
