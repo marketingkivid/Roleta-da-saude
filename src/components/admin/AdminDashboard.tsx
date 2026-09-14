@@ -4,7 +4,8 @@ import {
 } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Zap, PauseCircle, Download } from 'lucide-react';
+import { Zap, PauseCircle, Download, Mail, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import PeriodFilter, { type Period, getSinceDate, getPreviousRange } from './PeriodFilter';
 import { FONT, CARD } from '@/lib/admin-styles';
 import { campaignUrl } from '@/lib/campaign-url';
@@ -97,6 +98,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [campaignCards, setCampaignCards] = useState<CampaignCard[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+  const [brevoPending, setBrevoPending] = useState<number | null>(null);
+  const [brevoReprocessing, setBrevoReprocessing] = useState(false);
 
   const [data, setData] = useState<DashboardData>({
     revenue: 0, revenueChange: '—',
@@ -123,6 +126,32 @@ const AdminDashboard = () => {
     };
     fetchCampaigns();
   }, []);
+
+  // Contatos de /leads ainda não sincronizados com o Brevo (erro ou pendente).
+  const fetchBrevoPending = useCallback(async () => {
+    const { count } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .in('brevo_sync_status', ['error', 'pending']);
+    setBrevoPending(count || 0);
+  }, []);
+
+  useEffect(() => { fetchBrevoPending(); }, [fetchBrevoPending]);
+
+  const reprocessBrevo = async () => {
+    setBrevoReprocessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fix-brevo-errors');
+      if (error) throw error;
+      const synced = data?.synced ?? 0;
+      toast.success(synced > 0 ? `${synced} contato(s) sincronizado(s)!` : 'Nada pendente no momento.');
+      await fetchBrevoPending();
+    } catch {
+      toast.error('Não foi possível reprocessar agora.');
+    } finally {
+      setBrevoReprocessing(false);
+    }
+  };
 
   const handlePeriodChange = useCallback((p: Period) => setActivePeriod(p), []);
   const handleCampaignSelect = useCallback((id: string) => setSelectedCampaign(id), []);
@@ -356,6 +385,47 @@ const AdminDashboard = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Sincronização Brevo ──────────────────── */}
+      {!!brevoPending && (
+        <div
+          className="flex items-center justify-between gap-3 flex-wrap"
+          style={{
+            ...CARD,
+            padding: '14px 20px',
+            background: '#FFFBEB',
+            border: '1px solid #FDE68A',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%', background: '#FEF3C7',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Mail size={16} style={{ color: '#B45309' }} />
+            </div>
+            <div>
+              <p style={{ ...FONT, fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>Sincronização Brevo</p>
+              <p style={{ ...FONT, fontSize: 13, color: '#92400E' }}>
+                {brevoPending} contato{brevoPending === 1 ? '' : 's'} não sincronizado{brevoPending === 1 ? '' : 's'} com o Brevo
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={reprocessBrevo}
+            disabled={brevoReprocessing}
+            className="flex items-center gap-2 transition-all hover:opacity-90"
+            style={{
+              ...FONT, fontSize: 13, fontWeight: 700, color: '#FFFFFF',
+              background: '#B45309', border: 'none', borderRadius: 50, padding: '8px 18px',
+              cursor: brevoReprocessing ? 'wait' : 'pointer', flexShrink: 0,
+            }}
+          >
+            <RefreshCw size={14} className={brevoReprocessing ? 'animate-spin' : ''} />
+            {brevoReprocessing ? 'Reprocessando…' : 'Reprocessar'}
+          </button>
+        </div>
+      )}
 
       {/* ── Campaign cards selector ───────────────── */}
       <div>

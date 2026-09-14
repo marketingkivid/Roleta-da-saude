@@ -387,6 +387,7 @@ export function useCampaign(slug?: string) {
         lead_ref: leadRefRef.current,
         device_id,
         email: participantData.email || undefined,
+        name: participantData.name || undefined,
       },
     });
     if (error || !data || data.error) {
@@ -401,7 +402,7 @@ export function useCampaign(slug?: string) {
       left: result.attemptsLeft,
     });
     return result;
-  }, [campaignId, participantData.email]);
+  }, [campaignId, participantData.email, participantData.name]);
 
   // Chamado quando a roleta PARA e a participação está encerrada (ganhou ou
   // zerou as chances). Registra a participação e leva à tela de resultado.

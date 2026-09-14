@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { X, Plus, Minus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download, FlaskConical, Dices } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Copy, Check, ChevronRight, ChevronLeft, CalendarCheck, CalendarX, Zap, Gift, Link2, Loader2, Download, FlaskConical, Dices, Send } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import PrizeImageUpload from './PrizeImageUpload';
@@ -493,6 +493,55 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       }}
     >
       <Download size={16} /> Baixar lista com links
+    </button>
+  );
+
+  // Convite por e-mail (Personalização) — só faz sentido pra campanha com
+  // lista de participantes, já com token gerado (depois de salvar).
+  const [sendingInvites, setSendingInvites] = useState(false);
+  const sendInvites = async () => {
+    if (!savedCampaignId) { toast.error('Salve a campanha primeiro'); return; }
+    setSendingInvites(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invite-emails', {
+        body: { campaign_id: savedCampaignId },
+      });
+      if (error || data?.error) {
+        const code = data?.error;
+        if (code === 'email_settings_not_configured') {
+          toast.error('Configure a Personalização (remetente) antes de enviar convites.');
+        } else {
+          toast.error('Não foi possível enviar os convites agora.');
+        }
+        return;
+      }
+      const sent = data?.sent ?? 0;
+      const remaining = data?.remaining ?? 0;
+      if (sent === 0 && remaining === 0) {
+        toast.success('Todo mundo já foi convidado! 🎉');
+      } else {
+        toast.success(`${sent} convite${sent === 1 ? '' : 's'} enviado${sent === 1 ? '' : 's'}!${remaining > 0 ? ` Clique de novo pra enviar os outros ${remaining}.` : ''}`);
+      }
+    } catch {
+      toast.error('Não foi possível enviar os convites agora.');
+    } finally {
+      setSendingInvites(false);
+    }
+  };
+
+  const SendInvitesButton = () => (
+    <button
+      onClick={sendInvites}
+      disabled={sendingInvites}
+      className="flex items-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+      style={{
+        ...FONT, background: '#E8357A', color: '#FFFFFF', border: 'none',
+        borderRadius: 50, padding: '10px 20px', fontWeight: 700, fontSize: 14,
+        cursor: sendingInvites ? 'wait' : 'pointer',
+      }}
+    >
+      {sendingInvites ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+      {sendingInvites ? 'Enviando…' : 'Enviar convites'}
     </button>
   );
 
@@ -1243,8 +1292,9 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                 )}
 
                 {savedCampaignId && hasImportedParticipants && (
-                  <div className="flex justify-center">
+                  <div className="flex justify-center gap-3 flex-wrap">
                     <DownloadLinksButton />
+                    <SendInvitesButton />
                   </div>
                 )}
               </div>
@@ -1254,8 +1304,9 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
             {step === 3 && (
               <div className="space-y-4">
                 {hasImportedParticipants && (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-3 flex-wrap">
                     <DownloadLinksButton />
+                    <SendInvitesButton />
                   </div>
                 )}
                 <ProbabilityEditor

@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { LogOut, Trophy, Megaphone, PlusCircle, Menu, X, Plus } from 'lucide-react';
+import { LogOut, Trophy, Megaphone, PlusCircle, Menu, X, Plus, Mail } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import KividLogo from '@/assets/kivid-logo.svg';
 import { FONT } from '@/lib/admin-styles';
@@ -9,8 +9,9 @@ import { FONT } from '@/lib/admin-styles';
 const AdminDashboard = lazy(() => import('@/components/admin/AdminDashboard'));
 const CampaignList = lazy(() => import('@/components/admin/CampaignList'));
 const CampaignModal = lazy(() => import('@/components/admin/CampaignModal'));
+const EmailSettings = lazy(() => import('@/components/admin/EmailSettings'));
 
-type AdminTab = 'dashboard' | 'campaigns';
+type AdminTab = 'dashboard' | 'campaigns' | 'personalizacao';
 
 const TabFallback = () => (
   <div className="space-y-4">
@@ -141,6 +142,7 @@ const Admin = () => {
   const navItems = [
     { key: 'dashboard' as AdminTab, label: 'Dashboard', icon: Trophy },
     { key: 'campaigns' as AdminTab, label: 'Minhas Campanhas', icon: Megaphone },
+    { key: 'personalizacao' as AdminTab, label: 'Personalização', icon: Mail },
   ];
 
   if (loading) {
@@ -287,6 +289,7 @@ const Admin = () => {
           <Suspense fallback={<TabFallback />}>
             {activeTab === 'dashboard' && <AdminDashboard />}
             {activeTab === 'campaigns' && <CampaignList key={campaignListKey} onEdit={openEdit} onDuplicate={handleDuplicate} />}
+            {activeTab === 'personalizacao' && <EmailSettings />}
           </Suspense>
         </main>
       </div>

@@ -1,20 +1,71 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
+import { emailSubject, renderEmailHtml, type EmailSettings } from "../_shared/email-template.ts";
+import { sendTransactionalEmail } from "../_shared/brevo-send.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://roleta-kivid.pages.dev").replace(/\/+$/, "");
+const LOGO_URL = `${SITE_URL}/kivid-logo.svg`;
+
 const BodySchema = z.object({
   campaign_id: z.string().uuid(),
   lead_ref: z.string().min(1).max(200),
   device_id: z.string().min(1).max(200).optional(),
   email: z.string().email().max(320).optional(),
+  name: z.string().max(200).optional(),
   // Só consulta o estado de tentativas — não sorteia.
   check_only: z.boolean().optional(),
 });
+
+/**
+ * Dispara o e-mail de "você ganhou" (best-effort — nunca derruba o giro se
+ * o Brevo falhar ou as configurações ainda não tiverem sido salvas em
+ * Personalização). "Cupom" (tem checkout_url) ou "prêmio físico" (sem).
+ */
+async function sendPrizeEmailBestEffort(campaignName: string, prize: PrizeRow, toEmail: string, toName: string) {
+  try {
+    if (!toEmail) return;
+    const { data: settingsRow } = await supabase
+      .from("email_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle();
+    if (!settingsRow) return;
+    const settings = settingsRow as unknown as EmailSettings;
+    if (!settings.sender_email) return; // Personalização ainda não configurada
+
+    const kind = prize.checkout_url ? "prize_coupon" : "prize_physical";
+    const vars = {
+      nome: toName || "",
+      campanha: campaignName,
+      premio: prize.name,
+      checkoutUrl: prize.checkout_url ?? undefined,
+    };
+    const subject = emailSubject(kind, settings, vars);
+    const html = renderEmailHtml(kind, settings, vars, { logoUrl: LOGO_URL });
+    const sender = { name: settings.sender_name || "Kivid", email: settings.sender_email };
+
+    const result = await sendTransactionalEmail({ to: { email: toEmail, name: toName || undefined }, sender, subject, html });
+    if (!result.ok) {
+      console.error("[spin-roulette] prize email failed", { status: result.status, body: result.body });
+      if (settings.failure_alert_email) {
+        await sendTransactionalEmail({
+          to: { email: settings.failure_alert_email },
+          sender,
+          subject: `⚠️ Falha ao enviar e-mail de prêmio — ${campaignName}`,
+          html: `<p>Não foi possível enviar o e-mail de prêmio para ${toEmail} (campanha ${campaignName}, prêmio ${prize.name}). Status ${result.status}.</p>`,
+        }).catch(() => { /* noop */ });
+      }
+    }
+  } catch (e) {
+    console.error("[spin-roulette] prize email fatal", e);
+  }
+}
 
 /** IP do cliente a partir dos headers do edge runtime. */
 function clientIp(req: Request): string | null {
@@ -170,16 +221,17 @@ Deno.serve(async (req) => {
     const { campaign_id, lead_ref } = parsed.data;
     const device_id = parsed.data.device_id ?? null;
     const email = parsed.data.email?.trim().toLowerCase() ?? null;
+    const name = parsed.data.name?.trim() ?? "";
     const checkOnly = parsed.data.check_only === true;
     const client_ip = clientIp(req);
 
     const { data: campaignRow, error: cErr } = await supabase
       .from("campaigns")
-      .select("id, active, mechanic, has_participant_list, is_test, participation_limit")
+      .select("id, name, active, mechanic, has_participant_list, is_test, participation_limit")
       .eq("id", campaign_id)
       .maybeSingle();
     const campaign = campaignRow as {
-      id: string; active: boolean; mechanic: string;
+      id: string; name: string; active: boolean; mechanic: string;
       has_participant_list: boolean; is_test: boolean; participation_limit: number | null;
     } | null;
 
@@ -388,6 +440,13 @@ Deno.serve(async (req) => {
     console.log("[spin-roulette] draw", {
       campaign_id, prize_id: winner.id, attempt, maxAttempts, won, finished,
     });
+
+    // Ganhou de verdade (não consolação) → dispara o e-mail de prêmio.
+    // Best-effort: se falhar, o giro já está registrado e a pessoa já vê o
+    // prêmio na tela — a falha de e-mail nunca derruba a experiência.
+    if (won && !isTest && email) {
+      await sendPrizeEmailBestEffort(campaign.name, winner, email, name);
+    }
 
     return spinResponse(winner, segments, { attempt, maxAttempts, attemptsLeft, finished, won }, corsHeaders);
   } catch (e) {
