@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import PrizeImageUpload from './PrizeImageUpload';
 import RouletteWheelPreview from './RouletteWheelPreview';
 import ProbabilityEditor from './ProbabilityEditor';
-import CampaignParticipantImport, { type ParsedRow } from './CampaignParticipantImport';
+import CampaignParticipantImport, { type ParsedRow, type SavedParticipantMeta } from './CampaignParticipantImport';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -16,6 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { FONT, inputStyle, labelStyle, helperStyle, focusHandler, blurHandler, generateSlug } from '@/lib/admin-styles';
+import { isInviteMember, hasInviteList } from '@/lib/participant-list';
 
 
 interface CampaignModalProps {
@@ -102,11 +103,12 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
 
   const [prizes, setPrizes] = useState<PrizeRow[]>(() => campaignId ? [] : [makeConsolationPrize(0)]);
   const [importedParticipants, setImportedParticipants] = useState<ParsedRow[]>([]);
+  const [brevoList, setBrevoList] = useState<{ id: number; name: string } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [savedCampaignId, setSavedCampaignId] = useState<string | null>(campaignId);
-  const [savedTokens, setSavedTokens] = useState<Record<string, string>>({});
+  const [savedMeta, setSavedMeta] = useState<Record<string, SavedParticipantMeta>>({});
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Probability state (real IDs from DB after save)
@@ -135,9 +137,11 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
           setSlugAvailable(true);
           setSlugChecking(false);
         }
+        const cAny = c as unknown as { brevo_list_id?: number | null; brevo_list_name?: string | null };
+        if (cAny.brevo_list_id) setBrevoList({ id: Number(cAny.brevo_list_id), name: cAny.brevo_list_name ?? '' });
       }
-      // Load existing participants with tokens — SÓ os importados via CSV
-      // (source = 'CSV Import'). Quem entrou organicamente numa campanha
+      // Carrega os participantes já salvos — SÓ a LISTA DE CONVITE entra no
+      // editor (isInviteMember). Quem entrou organicamente numa campanha
       // ABERTA (source = 'Roleta', gravado em useCampaign.submitValidation)
       // não pode contar aqui: se contasse, reabrir pra editar uma campanha
       // aberta depois que alguém já jogou faria o modal achar que é uma
@@ -145,19 +149,22 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       // (bug que já tinha acontecido no Pipoca e Ganhe).
       const { data: existingParts } = await supabase
         .from('campaign_participants')
-        .select('name, email, phone, unique_token')
-        .eq('campaign_id', campaignId)
-        .eq('source', 'CSV Import');
+        .select('id, name, email, phone, unique_token, source, played')
+        .eq('campaign_id', campaignId);
       if (existingParts?.length) {
-        setImportedParticipants(existingParts.map(p => ({
-          name: p.name,
-          email: p.email,
-          phone: p.phone,
-          status: 'valid' as const,
-        })));
-        const tokenMap: Record<string, string> = {};
-        existingParts.forEach(p => { if (p.unique_token) tokenMap[p.email] = p.unique_token; });
-        setSavedTokens(tokenMap);
+        const inviteMembers = existingParts.filter(p => isInviteMember(p.source));
+        if (inviteMembers.length) {
+          setImportedParticipants(inviteMembers.map(p => ({
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            source: p.source ?? undefined,
+            status: 'valid' as const,
+          })));
+        }
+        const meta: Record<string, SavedParticipantMeta> = {};
+        inviteMembers.forEach(p => { if (p.unique_token) meta[p.email] = { id: p.id, token: p.unique_token, played: p.played }; });
+        setSavedMeta(meta);
       }
       const { data: pz } = await supabase.from('prizes').select('*').eq('campaign_id', campaignId).order('created_at');
       if (pz) {
@@ -310,7 +317,9 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       active: form.active,
       is_test: form.is_test,
       slug,
-      has_participant_list: importedParticipants.filter(r => r.status === 'valid').length > 0 || hasImportedParticipants,
+      has_participant_list: hasInviteList(importedParticipants),
+      brevo_list_id: brevoList?.id ?? null,
+      brevo_list_name: brevoList?.name ?? null,
     };
 
 
@@ -384,7 +393,7 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
       const newRows = validParticipants.filter(r => !existingEmails.has(r.email));
       if (newRows.length > 0) {
         await supabase.from('campaign_participants').insert(
-          newRows.map(r => ({ campaign_id: campId, name: r.name, email: r.email, phone: r.phone, source: 'CSV Import' }))
+          newRows.map(r => ({ campaign_id: campId, name: r.name, email: r.email, phone: r.phone, source: r.source || 'Manual' }))
         );
       }
     }
@@ -416,12 +425,14 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
     if (campId) {
       const { data: parts } = await supabase
         .from('campaign_participants')
-        .select('email, unique_token')
+        .select('id, email, unique_token, source, played')
         .eq('campaign_id', campId);
       if (parts?.length) {
-        const tokenMap: Record<string, string> = {};
-        parts.forEach(p => { if (p.unique_token) tokenMap[p.email] = p.unique_token; });
-        setSavedTokens(tokenMap);
+        const meta: Record<string, SavedParticipantMeta> = {};
+        parts.filter(p => isInviteMember(p.source)).forEach(p => {
+          if (p.unique_token) meta[p.email] = { id: p.id, token: p.unique_token, played: p.played };
+        });
+        setSavedMeta(meta);
       }
     }
 
@@ -466,11 +477,11 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
 
   const downloadParticipantLinks = async () => {
     if (!savedCampaignId) { toast.error('Salve a campanha primeiro'); return; }
-    const { data, error } = await supabase
+    const { data: allParts, error } = await supabase
       .from('campaign_participants')
-      .select('name, email, phone, unique_token')
-      .eq('campaign_id', savedCampaignId)
-      .eq('source', 'CSV Import');
+      .select('name, email, phone, unique_token, source')
+      .eq('campaign_id', savedCampaignId);
+    const data = allParts?.filter(p => isInviteMember(p.source));
     if (error || !data?.length) { toast.error('Nenhum participante encontrado'); return; }
     const slug = form.slug;
     const BOM = '\uFEFF';
@@ -1020,7 +1031,14 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
                 <div style={{ marginTop: 16 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1A1A2E', ...FONT }}>Lista de participantes</h3>
                   <p style={{ fontSize: 13, color: '#9B8FAE', marginBottom: 12, ...FONT }}>Importe sua lista de contatos em formato CSV</p>
-                  <CampaignParticipantImport onParsed={setImportedParticipants} initialRows={importedParticipants} savedTokens={Object.keys(savedTokens).length > 0 ? savedTokens : undefined} slug={form.slug} />
+                  <CampaignParticipantImport
+                    onParsed={setImportedParticipants}
+                    initialRows={importedParticipants}
+                    savedMeta={Object.keys(savedMeta).length > 0 ? savedMeta : undefined}
+                    slug={form.slug}
+                    brevoList={brevoList}
+                    onBrevoListChange={setBrevoList}
+                  />
                 </div>
 
 
