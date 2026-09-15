@@ -1,14 +1,17 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { LogOut, Trophy, Megaphone, PlusCircle, Menu, X, Plus, Mail } from 'lucide-react';
+import { LogOut, Trophy, Megaphone, PlusCircle, Menu, X, Plus, KeyRound, Mail } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import KividLogo from '@/assets/kivid-logo.svg';
 import { FONT } from '@/lib/admin-styles';
+import AuthScreen from '@/components/admin/AuthScreen';
+import { isRecoveryPending } from '@/lib/admin-recovery';
 
 const AdminDashboard = lazy(() => import('@/components/admin/AdminDashboard'));
 const CampaignList = lazy(() => import('@/components/admin/CampaignList'));
 const CampaignModal = lazy(() => import('@/components/admin/CampaignModal'));
+const ChangePasswordModal = lazy(() => import('@/components/admin/ChangePasswordModal'));
 const EmailSettings = lazy(() => import('@/components/admin/EmailSettings'));
 
 type AdminTab = 'dashboard' | 'campaigns' | 'personalizacao';
@@ -26,11 +29,12 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [userEmail, setUserEmail] = useState('');
+  // Inicia true se a última recuperação ficou pela metade: impede que o dashboard
+  // pisque com a sessão do verifyOtp antes do AuthScreen encerrá-la.
+  const [recoveryActive, setRecoveryActive] = useState(isRecoveryPending);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
@@ -66,17 +70,12 @@ const Admin = () => {
         });
       } else {
         setIsAdmin(false);
+        // Sem isso o modal reabriria sozinho no próximo login.
+        setShowChangePassword(false);
       }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError('E-mail ou senha incorretos. Tente novamente.');
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -156,38 +155,13 @@ const Admin = () => {
     );
   }
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated || !isAdmin || recoveryActive) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#f8f9f9', ...FONT }}>
-        <div className="w-full max-w-sm">
-          <div className="p-8 space-y-6" style={{ background: '#FFFFFF', border: '1px solid #E8E0EE', borderRadius: 20 }}>
-            <div className="text-center space-y-2">
-              <img src={KividLogo} alt="Kivid" className="h-10 mx-auto" />
-              <p style={{ fontSize: 13, color: '#9B8FAE', ...FONT }}>Backoffice</p>
-            </div>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block mb-1.5" style={{ fontSize: 13, fontWeight: 400, color: '#9B8FAE', ...FONT }}>E-mail</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full outline-none transition-colors"
-                  style={{ border: '1.5px solid #E8E0EE', borderRadius: 20, padding: '13px 16px', fontSize: 16, ...FONT, background: '#FFFFFF', color: '#1A1A2E' }}
-                  onFocus={e => e.target.style.borderColor = '#E8357A'} onBlur={e => e.target.style.borderColor = '#E8E0EE'} />
-              </div>
-              <div>
-                <label className="block mb-1.5" style={{ fontSize: 13, fontWeight: 400, color: '#9B8FAE', ...FONT }}>Senha</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full outline-none transition-colors"
-                  style={{ border: '1.5px solid #E8E0EE', borderRadius: 20, padding: '13px 16px', fontSize: 16, ...FONT, background: '#FFFFFF', color: '#1A1A2E' }}
-                  onFocus={e => e.target.style.borderColor = '#E8357A'} onBlur={e => e.target.style.borderColor = '#E8E0EE'} />
-              </div>
-              {authError && <p style={{ fontSize: 16, color: '#c0392b', ...FONT }}>{authError}</p>}
-              {isAuthenticated && !isAdmin && <p style={{ fontSize: 16, color: '#c0392b', ...FONT }}>Sua conta não possui permissão de administrador.</p>}
-              <button type="submit" className="w-full transition-all hover:opacity-90 active:scale-[0.98]"
-                style={{ background: '#E8357A', color: '#fff', borderRadius: 50, padding: '12px 20px', fontWeight: 700, fontSize: 16, ...FONT, border: 'none', cursor: 'pointer' }}>
-                Entrar
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
+      <AuthScreen
+        isAuthenticated={isAuthenticated}
+        isAdmin={isAdmin}
+        onRecoveryActiveChange={setRecoveryActive}
+      />
     );
   }
 
@@ -246,7 +220,15 @@ const Admin = () => {
           <div className="flex-1 min-w-0">
             <p className="truncate" style={{ fontSize: 13, color: '#5A5A7A', ...FONT }}>{userEmail}</p>
           </div>
-          <button onClick={handleLogout} title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B8FAE', flexShrink: 0 }}>
+          <button
+            onClick={() => { setShowChangePassword(true); setSidebarOpen(false); }}
+            title="Alterar senha"
+            aria-label="Alterar senha"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B8FAE', flexShrink: 0 }}
+          >
+            <KeyRound size={16} />
+          </button>
+          <button onClick={handleLogout} title="Sair" aria-label="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B8FAE', flexShrink: 0 }}>
             <LogOut size={16} />
           </button>
         </div>
@@ -317,6 +299,12 @@ const Admin = () => {
             onClose={closeModal}
             onSaved={onSaved}
           />
+        </Suspense>
+      )}
+
+      {showChangePassword && (
+        <Suspense fallback={null}>
+          <ChangePasswordModal email={userEmail} onClose={() => setShowChangePassword(false)} />
         </Suspense>
       )}
     </div>
