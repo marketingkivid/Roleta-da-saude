@@ -45,6 +45,7 @@ async function sendPrizeEmailBestEffort(campaignName: string, prize: PrizeRow, t
       campanha: campaignName,
       premio: prize.name,
       checkoutUrl: prize.checkout_url ?? undefined,
+      premioImagem: prize.image_url || undefined,
     };
     const subject = emailSubject(kind, settings, vars);
     const html = renderEmailHtml(kind, settings, vars, { logoUrl: LOGO_URL });

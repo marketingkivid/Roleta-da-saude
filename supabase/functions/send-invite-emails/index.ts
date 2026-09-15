@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
       .select("id, name, email, unique_token", { count: "exact" })
       .eq("campaign_id", campaign_id)
       .is("invited_at", null)
+      .eq("played", false) // quem já jogou não precisa de convite
       .order("created_at", { ascending: true })
       .limit(BATCH_SIZE);
 

@@ -3,13 +3,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Mail, X, Loader2 } from 'lucide-react';
 import { FONT, CARD, inputStyle, labelStyle, helperStyle, focusHandler, blurHandler } from '@/lib/admin-styles';
-import { renderEmailHtml, emailSubject, type EmailSettings as EmailSettingsRow, type EmailKind } from '@/lib/email-template';
 
 // `email_settings` é uma tabela nova (Personalização) ainda não coberta pelo
 // gerador de tipos do Supabase — mesmo padrão de cast usado em outras
 // colunas recentes deste projeto (ver CampaignModal `is_test`).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const table = () => (supabase as any).from('email_settings');
+
+export interface EmailSettingsRow {
+  whatsapp_oficial: string;
+  sender_name: string;
+  sender_email: string;
+  prize_subject: string;
+  prize_title: string;
+  contact_block_title: string;
+  contact_block_text: string;
+  antifraud_notice: string;
+  failure_alert_email: string;
+  invite_subject: string;
+  invite_title: string;
+  invite_body: string;
+  invite_button_text: string;
+}
+
+type EmailKind = 'prize_coupon' | 'prize_physical' | 'invite';
 
 const EMPTY: EmailSettingsRow = {
   whatsapp_oficial: '',
@@ -25,15 +42,6 @@ const EMPTY: EmailSettingsRow = {
   invite_title: '{nome}, você foi convidado!',
   invite_body: 'O Kivid preparou uma surpresa para você: gire a roleta e concorra a prêmios na campanha {campanha}. É rapidinho — toque no botão abaixo para participar.',
   invite_button_text: 'Quero girar 🎡',
-};
-
-const SAMPLE_VARS = {
-  nome: 'Igor',
-  campanha: 'Campanha de Exemplo',
-  premio: 'Passaporte Kivid',
-  email: 'igor.exemplo@kivid.com.br',
-  checkoutUrl: '#',
-  inviteUrl: '#',
 };
 
 const FIELDS: { key: keyof EmailSettingsRow; label: string; helper?: string; area?: boolean }[] = [
@@ -79,16 +87,22 @@ const EmailSettings = () => {
     toast.success('Personalização salva!');
   };
 
+  // Prévia renderizada pelo servidor (preview-email) — o MESMO código que
+  // monta o e-mail de verdade, então o que aparece aqui é exatamente o que
+  // é enviado. Por isso só reflete o que já está salvo, não o rascunho na tela.
   const openPreview = async (kind: EmailKind) => {
     setPreviewLoading(kind);
-    const { data } = await table().select('*').eq('id', true).maybeSingle();
+    const { data, error } = await supabase.functions.invoke('preview-email', { body: { kind } });
     setPreviewLoading(null);
-    if (!data) { toast.error('Salve as configurações antes de ver a prévia.'); return; }
-    const settings = data as unknown as EmailSettingsRow;
-    const logoUrl = `${window.location.origin}/kivid-logo.svg`;
-    const html = renderEmailHtml(kind, settings, SAMPLE_VARS, { logoUrl });
-    const subject = emailSubject(kind, settings, SAMPLE_VARS);
-    setPreview({ subject, html });
+    if (error || !data?.html) {
+      if (data?.error === 'email_settings_not_configured') {
+        toast.error('Salve as configurações antes de ver a prévia.');
+      } else {
+        toast.error('Não foi possível gerar a prévia agora.');
+      }
+      return;
+    }
+    setPreview({ subject: data.subject, html: data.html });
   };
 
   if (loading) {
