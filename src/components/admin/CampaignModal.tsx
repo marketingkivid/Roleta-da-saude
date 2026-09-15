@@ -136,11 +136,18 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
           setSlugChecking(false);
         }
       }
-      // Load existing participants with tokens
+      // Load existing participants with tokens — SÓ os importados via CSV
+      // (source = 'CSV Import'). Quem entrou organicamente numa campanha
+      // ABERTA (source = 'Roleta', gravado em useCampaign.submitValidation)
+      // não pode contar aqui: se contasse, reabrir pra editar uma campanha
+      // aberta depois que alguém já jogou faria o modal achar que é uma
+      // campanha "com lista" e travar o acesso público atrás de token
+      // (bug que já tinha acontecido no Pipoca e Ganhe).
       const { data: existingParts } = await supabase
         .from('campaign_participants')
         .select('name, email, phone, unique_token')
-        .eq('campaign_id', campaignId);
+        .eq('campaign_id', campaignId)
+        .eq('source', 'CSV Import');
       if (existingParts?.length) {
         setImportedParticipants(existingParts.map(p => ({
           name: p.name,
@@ -462,7 +469,8 @@ const CampaignModal = ({ campaignId, onClose, onSaved }: CampaignModalProps) => 
     const { data, error } = await supabase
       .from('campaign_participants')
       .select('name, email, phone, unique_token')
-      .eq('campaign_id', savedCampaignId);
+      .eq('campaign_id', savedCampaignId)
+      .eq('source', 'CSV Import');
     if (error || !data?.length) { toast.error('Nenhum participante encontrado'); return; }
     const slug = form.slug;
     const BOM = '\uFEFF';
