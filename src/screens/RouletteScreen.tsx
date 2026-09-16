@@ -727,12 +727,14 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
       <div
         ref={wheelWrapRef}
         className="relative"
+        onClick={spinState === 'idle' ? handleSpin : undefined}
         style={{
           width: size + 40,
           height: size + 40,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          cursor: spinState === 'idle' ? 'pointer' : 'default',
         }}
       >
         {/* Pointer */}
@@ -1048,7 +1050,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
       {/* Spin button / status */}
       <div
-        className="mt-3 sm:mt-6 flex flex-col items-center gap-2 sm:gap-3 w-full max-w-sm px-2 shrink-0"
+        className="mt-3 sm:mt-6 flex flex-col items-center gap-3 sm:gap-4 w-full max-w-sm px-2 shrink-0"
         style={{ marginBottom: 'max(20px, env(safe-area-inset-bottom))' }}
       >
 
