@@ -116,7 +116,6 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   const wheelRef = useRef<SVGSVGElement | null>(null);
   const wheelWrapRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const hapticTimersRef = useRef<number[]>([]);
   // Chances restantes "congeladas" no instante em que o giro começa.
@@ -540,9 +539,10 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     };
     document.addEventListener('touchmove', onTouchMove, { passive: false });
 
-    // Focus the close button first so keyboard/screen-reader users land inside the dialog.
+    // Sem botão de fechar: foca o diálogo em si, pra leitor de tela/teclado
+    // entrar no modal (o Tab de lá segue pro CTA principal).
     const focusTimer = window.setTimeout(() => {
-      closeBtnRef.current?.focus({ preventScroll: true });
+      dialogRef.current?.focus({ preventScroll: true });
     }, 30);
 
 
@@ -1123,34 +1123,6 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
               outline: 'none',
             }}
           >
-            <button
-              ref={closeBtnRef}
-              type="button"
-              onClick={() => dismissModal()}
-              aria-label="Fechar"
-              className="kv-btn"
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                width: 44,
-                height: 44,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'transparent',
-                color: PURPLE_DEEP,
-                border: `2px solid ${LAVENDER}`,
-                borderRadius: 999,
-                fontSize: 22,
-                fontWeight: 900,
-                lineHeight: 1,
-                cursor: 'pointer',
-              }}
-            >
-              ×
-            </button>
-
             <p
               aria-live="polite"
               style={{
