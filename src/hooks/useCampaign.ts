@@ -50,6 +50,8 @@ export interface SpinResult {
   finished: boolean;
   /** Ganhou um prêmio real (não a consolação). */
   won: boolean;
+  /** Servidor identificou que este e-mail/dispositivo já tinha girado antes; este resultado é o giro anterior, não um novo sorteio. */
+  already_spun?: boolean;
 }
 
 /** Estado de chances do jogador nesta campanha. */
@@ -368,6 +370,37 @@ export function useCampaign(slug?: string) {
       try { localStorage.setItem(leadStorageKey(campaignId), JSON.stringify(data)); } catch { /* noop */ }
     }
 
+    // Confere no servidor se este e-mail já finalizou a campanha (em outro
+    // aparelho, por exemplo) antes de girar — evita preencher tudo de novo
+    // só para descobrir depois que já jogou.
+    if (campaignId) {
+      try {
+        const device_id = await getDeviceId().catch(() => undefined);
+        const { data: checkData } = await supabase.functions.invoke('spin-roulette', {
+          body: {
+            campaign_id: campaignId,
+            lead_ref: leadRefRef.current,
+            device_id,
+            email: data.email || undefined,
+            check_only: true,
+          },
+        });
+        const check = checkData as {
+          finished?: boolean; already_spun?: boolean; won?: boolean; prize?: SpinResult['prize'];
+        } | null;
+        if ((check?.finished || check?.already_spun) && check.prize) {
+          const won = buildPrize(check.prize);
+          setPrize(won);
+          try {
+            localStorage.setItem(spunStorageKey(campaignId), JSON.stringify(won));
+            localStorage.setItem(playedStorageKey(campaignId), 'true');
+          } catch { /* noop */ }
+          setStep(check.won ? 'reward' : 'consolation');
+          return { success: true };
+        }
+      } catch { /* noop: se a checagem falhar, segue o fluxo normal para não travar */ }
+    }
+
     setStep('game');
     return { success: true };
   }, [campaignId, hasParticipantList, participantId]);
@@ -418,17 +451,22 @@ export function useCampaign(slug?: string) {
       } catch { /* noop */ }
     }
 
-    // Uma única participação por pessoa (o prêmio final: vitória ou consolação).
-    await supabase.from('participations').insert({
-      name: participantData.name,
-      email: participantData.email,
-      whatsapp: participantData.whatsapp,
-      prize_id: won.id,
-      campaign_id: campaignId,
-    });
+    // O servidor já tinha esse giro registrado (mesmo e-mail/dispositivo em
+    // outra sessão) — é o prêmio de antes, não uma participação nova. Evita
+    // duplicar o registro de resgate.
+    if (!spinResult.already_spun) {
+      // Uma única participação por pessoa (o prêmio final: vitória ou consolação).
+      await supabase.from('participations').insert({
+        name: participantData.name,
+        email: participantData.email,
+        whatsapp: participantData.whatsapp,
+        prize_id: won.id,
+        campaign_id: campaignId,
+      });
 
-    if (participantId) {
-      await supabase.rpc('mark_participant_played', { p_participant_id: participantId });
+      if (participantId) {
+        await supabase.rpc('mark_participant_played', { p_participant_id: participantId });
+      }
     }
 
     setStep(spinResult.won ? 'reward' : 'consolation');
