@@ -726,7 +726,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
       <div
         ref={wheelWrapRef}
-        className="relative"
+        className={`relative ${spinState === 'requesting' ? 'kv-wheel-charging' : ''}`}
         onClick={spinState === 'idle' ? handleSpin : undefined}
         style={{
           width: size + 40,
@@ -1257,6 +1257,19 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
         .kv-btn-continue:focus-visible {
           outline-color: ${PITAYA_600};
           box-shadow: 0 0 0 6px rgba(207, 58, 157, 0.18);
+        }
+
+        /* "Carregando o giro" — feedback instantâneo no toque, enquanto o
+           servidor sorteia. Sem isso a roleta fica parada e parece travada
+           entre o toque e o início do giro de verdade. */
+        @keyframes kv-charge {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          25%      { transform: scale(1.02) rotate(-3deg); }
+          75%      { transform: scale(1.02) rotate(3deg); }
+        }
+        .kv-wheel-charging { animation: kv-charge 0.32s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .kv-wheel-charging { animation: none !important; }
         }
 
         @keyframes coin-fall {

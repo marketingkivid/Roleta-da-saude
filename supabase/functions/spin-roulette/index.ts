@@ -12,6 +12,19 @@ const supabase = createClient(
 const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://roleta-kivid.pages.dev").replace(/\/+$/, "");
 const LOGO_URL = `${SITE_URL}/kivid-logo.svg`;
 
+// Runtime das Edge Functions do Supabase (Deno Deploy) expõe este global pra
+// terminar trabalho DEPOIS de já ter respondido ao cliente — usado pra não
+// fazer a pessoa esperar o e-mail do Brevo pra ver o resultado do giro.
+declare const EdgeRuntime: { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
+
+function runInBackground(promise: Promise<unknown>): void {
+  if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+    EdgeRuntime.waitUntil(promise);
+  } else {
+    promise.catch(() => { /* noop */ });
+  }
+}
+
 const BodySchema = z.object({
   campaign_id: z.string().uuid(),
   lead_ref: z.string().min(1).max(200),
@@ -226,17 +239,35 @@ Deno.serve(async (req) => {
     const checkOnly = parsed.data.check_only === true;
     const client_ip = clientIp(req);
 
-    const { data: campaignRow, error: cErr } = await supabase
-      .from("campaigns")
-      .select("id, name, active, mechanic, has_participant_list, is_test, participation_limit")
-      .eq("id", campaign_id)
-      .maybeSingle();
-    const campaign = campaignRow as {
+    // As três buscas abaixo não dependem uma da outra (todas só precisam do
+    // campaign_id, que já veio no corpo da requisição) — rodar em paralelo
+    // troca 3 idas-e-voltas sequenciais por só 1, o maior ganho de latência
+    // do giro. Se a campanha acabar sendo inválida, o trabalho extra de
+    // prêmios/segmentos é só descartado — barato perto do tempo economizado.
+    const [campaignRes, prizesRes, segmentsRes] = await Promise.all([
+      supabase
+        .from("campaigns")
+        .select("id, name, active, mechanic, has_participant_list, is_test, participation_limit")
+        .eq("id", campaign_id)
+        .maybeSingle(),
+      supabase
+        .from("prizes")
+        .select("*")
+        .eq("campaign_id", campaign_id)
+        .eq("active", true)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+      // Fetch the exact segment layout the client renders so segmentIndex
+      // aligns with the visible slice (including interleaved consolation copies).
+      supabase.rpc("get_wheel_segments", { p_campaign: campaign_id }),
+    ]);
+
+    const campaign = campaignRes.data as {
       id: string; name: string; active: boolean; mechanic: string;
       has_participant_list: boolean; is_test: boolean; participation_limit: number | null;
     } | null;
 
-    if (cErr || !campaign) {
+    if (campaignRes.error || !campaign) {
       return new Response(JSON.stringify({ error: "campaign_not_found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -252,26 +283,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: prizes, error: pErr } = await supabase
-      .from("prizes")
-      .select("*")
-      .eq("campaign_id", campaign_id)
-      .eq("active", true)
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: true });
-
-    if (pErr || !prizes || prizes.length === 0) {
+    const prizes = prizesRes.data;
+    if (prizesRes.error || !prizes || prizes.length === 0) {
       return new Response(JSON.stringify({ error: "no_prizes" }), {
         status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch the exact segment layout the client renders so segmentIndex aligns
-    // with the visible slice (including interleaved consolation copies).
-    const { data: segmentsData, error: sErr } = await supabase.rpc("get_wheel_segments", {
-      p_campaign: campaign_id,
-    });
-    if (sErr || !segmentsData || segmentsData.length === 0) {
+    const segmentsData = segmentsRes.data;
+    if (segmentsRes.error || !segmentsData || segmentsData.length === 0) {
       return new Response(JSON.stringify({ error: "no_segments" }), {
         status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -358,10 +378,12 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Segunda camada (defesa extra): já existe uma participação FINALIZADA
-      // com este e-mail? Cobre o caso de dados antigos sem device_id/email
-      // gravado no giro.
-      if (!priorWin && email) {
+      // Segunda camada (defesa extra) — só entra quando não achou NENHUM
+      // giro reconhecido (mine vazio): cobre dados antigos sem device_id/
+      // email gravado no giro. Se já achou giros por device/lead/e-mail,
+      // qualquer vitória já apareceria neles — não precisa desta consulta
+      // extra a cada tentativa (2ª, 3ª... chance), só na primeira.
+      if (mine.length === 0 && email) {
         const { data: byEmail } = await supabase
           .from("participations")
           .select("prize_id")
@@ -442,11 +464,12 @@ Deno.serve(async (req) => {
       campaign_id, prize_id: winner.id, attempt, maxAttempts, won, finished,
     });
 
-    // Ganhou de verdade (não consolação) → dispara o e-mail de prêmio.
-    // Best-effort: se falhar, o giro já está registrado e a pessoa já vê o
-    // prêmio na tela — a falha de e-mail nunca derruba a experiência.
+    // Ganhou de verdade (não consolação) → dispara o e-mail de prêmio, em
+    // segundo plano — não faz a pessoa esperar o Brevo pra ver a tela do
+    // prêmio. O giro já está registrado; a falha de e-mail nunca derruba a
+    // experiência (é best-effort dentro de sendPrizeEmailBestEffort).
     if (won && !isTest && email) {
-      await sendPrizeEmailBestEffort(campaign.name, winner, email, name);
+      runInBackground(sendPrizeEmailBestEffort(campaign.name, winner, email, name));
     }
 
     return spinResponse(winner, segments, { attempt, maxAttempts, attemptsLeft, finished, won }, corsHeaders);
