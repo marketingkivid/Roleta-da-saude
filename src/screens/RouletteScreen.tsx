@@ -117,6 +117,15 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   const tooltipTimerRef = useRef<number | null>(null);
   const wheelRef = useRef<SVGSVGElement | null>(null);
   const wheelWrapRef = useRef<HTMLDivElement | null>(null);
+  // Medidos de verdade (não chutados): quanto espaço o cabeçalho da tela
+  // (título + badge) e o rodapé (botão + legenda) realmente ocupam, e
+  // quanto o container desta tela realmente tem de altura — esse já vem
+  // descontado do Header/ProgressBar da página (são de fora, ficam acima
+  // no layout), que antes não entravam na conta e faziam o botão sumir
+  // embaixo em telas de desktop mais baixas.
+  const screenRootRef = useRef<HTMLDivElement | null>(null);
+  const titleBlockRef = useRef<HTMLDivElement | null>(null);
+  const bottomBlockRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const hapticTimersRef = useRef<number[]>([]);
@@ -332,36 +341,57 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   const [viewportW, setViewportW] = useState<number>(
     typeof window !== 'undefined' ? window.innerWidth : 390
   );
-  const [viewportH, setViewportH] = useState<number>(
-    typeof window !== 'undefined' ? window.innerHeight : 780
-  );
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const onResize = () => {
-      setViewportW(window.innerWidth);
-      setViewportH(window.innerHeight);
-    };
+    const onResize = () => setViewportW(window.innerWidth);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // Mobile-first: usa quase toda a largura da tela; em telas maiores mantém limite confortável.
   const horizontalPadding = viewportW < 400 ? 8 : viewportW < 640 ? 14 : 48;
   const sizeByWidth = Math.max(240, viewportW - horizontalPadding);
-  // Reserva vertical para header + progressbar + título + botão + paddings.
-  // Assim o CTA fica visível sem rolar em telas pequenas.
   const isMobile = viewportW < 640;
   // Botão de girar — squircle grande (não pill): a proporção quase 1:1 lê
   // como "botão de verdade" (tecla, ícone de app), diferente de um pill
   // largo que lê como rótulo de texto. Mantém a área de toque do pill
   // anterior (52/60px de altura) ou maior — só muda o formato, não encolhe.
   const spinBtnSize = isMobile ? 88 : 108;
-  // Reserva vertical p/ header + progressbar + título + ponteiro + CTA + microcopy.
-  // Cresce em telas curtas para o CTA ficar visível sem rolar e o ponteiro não
-  // encostar no título (iPhone SE / navegadores com barra grande). Quando a
-  // campanha tem mais de 1 chance, o badge de tentativas soma uma linha extra.
-  const multiChanceReserve = attempts.max > 1 ? 24 : 0;
-  const chromeReserve = (viewportH < 720 ? 316 : viewportH < 820 ? 278 : 300) + multiChanceReserve;
-  const sizeByHeight = Math.max(220, viewportH - chromeReserve);
+
+  // Altura disponível de verdade (MEDIDA, não chutada): o quanto o
+  // cabeçalho (título + badge de chances) e o rodapé (botão + legenda)
+  // realmente ocupam, dentro do espaço que ESTA tela realmente recebe —
+  // que já vem descontado do Header/ProgressBar da página (ficam fora,
+  // acima). Um número fixo "chutado" ficava desatualizado toda vez que um
+  // desses blocos mudava de tamanho (foi o que sumiu com o botão no
+  // desktop quando ele cresceu) — medir elimina esse tipo de bug de vez.
+  const [chrome, setChrome] = useState({ container: 780, title: 64, bottom: 150 });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Só mede quando os 3 elementos já estão montados (nada disso existe
+    // durante a tela de carregamento) — nunca sobrescreve uma medida boa
+    // com o valor de reserva só porque essa chamada pegou o componente
+    // num instante sem os refs ainda presos.
+    const measure = () => {
+      if (!screenRootRef.current || !titleBlockRef.current || !bottomBlockRef.current) return;
+      setChrome({
+        container: screenRootRef.current.clientHeight,
+        title: titleBlockRef.current.offsetHeight,
+        bottom: bottomBlockRef.current.offsetHeight,
+      });
+    };
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (ro && screenRootRef.current) ro.observe(screenRootRef.current);
+    if (ro && titleBlockRef.current) ro.observe(titleBlockRef.current);
+    if (ro && bottomBlockRef.current) ro.observe(bottomBlockRef.current);
+    window.addEventListener('resize', measure);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [viewportW, attempts.max, loading]);
+
+  // O invólucro da roda (abaixo) é size+40 — 40px a mais que o SVG em si,
+  // espaço do ponteiro — então isso entra na conta, não só o título/rodapé.
+  // +16px de folga entre os blocos por cima disso.
+  const sizeByHeight = Math.max(220, chrome.container - chrome.title - chrome.bottom - 40 - 16);
   const size = Math.min(560, sizeByWidth, sizeByHeight);
 
   const cx = size / 2;
@@ -382,6 +412,13 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
     // Toque de largada — pulso mais grave e forte + thump sonoro contundente.
     feel([25, 20, 45], { freq: 55, duration: 0.09, gain: 0.5 });
+
+    // "Impulso" — a roda já reage no instante do toque, antes de qualquer
+    // resposta do servidor chegar. Puxa alguns graus pra trás (como um
+    // pião sendo armado); quando o giro de verdade começar, a transição
+    // continua dali mesmo — sem pulo, sem reset. É o que faz o toque
+    // parecer instantâneo mesmo com uma ida à rede no meio do caminho.
+    if (!prefersReducedMotion()) setRotation(prev => prev - 16);
 
     const result = await onSpin();
     if (!result) {
@@ -664,6 +701,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
   return (
     <div
+      ref={screenRootRef}
       className="relative flex-1 flex flex-col items-center justify-between px-3 sm:px-4 pt-2 w-full overflow-hidden"
       style={{
         fontFamily: 'Nunito, sans-serif',
@@ -680,7 +718,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
       {spinState === 'landed' && revealPrize && !revealPrize.is_consolation && <CoinRain />}
 
-      <div className="text-center mt-0 mb-1 sm:mb-3 shrink-0">
+      <div ref={titleBlockRef} className="text-center mt-0 mb-1 sm:mb-3 shrink-0">
         <p className="text-[10px] sm:text-xs" style={{ color: PURPLE, fontWeight: 800, letterSpacing: 2, textTransform: 'uppercase' }}>
           Roleta da sorte
         </p>
@@ -791,7 +829,9 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
               transition:
                 spinState === 'spinning'
                   ? `transform ${prefersReducedMotion() ? 0.5 : 6}s cubic-bezier(0.09, 0.75, 0.16, 1)`
-                  : 'none',
+                  : spinState === 'requesting'
+                    ? 'transform 220ms cubic-bezier(0.34, 0, 0.64, 1)'
+                    : 'none',
             }}
           >
           {/* Aro vinho — flat, sem gradiente (design final Kivid) */}
@@ -1057,6 +1097,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
       {/* Spin button / status */}
       <div
+        ref={bottomBlockRef}
         className="mt-3 sm:mt-6 flex flex-col items-center gap-3 sm:gap-4 w-full max-w-sm px-2 shrink-0"
         style={{ marginBottom: 'max(20px, env(safe-area-inset-bottom))' }}
       >
