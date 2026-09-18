@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RotateCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fitWheelLabel } from '@/lib/wheel-label';
 import { twemojiUrl, Emoji, EmojiText } from '@/lib/twemoji';
@@ -30,6 +31,7 @@ interface RouletteScreenProps {
 }
 
 // Kivid DS — família Pitaya sobre branco Kivid
+const PITAYA_500 = '#DB4AA8';   // topo do gradiente do botão de girar
 const PITAYA_600 = '#CF3A9D';   // primária
 const PITAYA_700 = '#B8348C';
 const PITAYA_800 = '#A82F7F';
@@ -348,6 +350,11 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   // Reserva vertical para header + progressbar + título + botão + paddings.
   // Assim o CTA fica visível sem rolar em telas pequenas.
   const isMobile = viewportW < 640;
+  // Botão de girar — squircle grande (não pill): a proporção quase 1:1 lê
+  // como "botão de verdade" (tecla, ícone de app), diferente de um pill
+  // largo que lê como rótulo de texto. Mantém a área de toque do pill
+  // anterior (52/60px de altura) ou maior — só muda o formato, não encolhe.
+  const spinBtnSize = isMobile ? 88 : 108;
   // Reserva vertical p/ header + progressbar + título + ponteiro + CTA + microcopy.
   // Cresce em telas curtas para o CTA ficar visível sem rolar e o ponteiro não
   // encostar no título (iPhone SE / navegadores com barra grande). Quando a
@@ -1059,36 +1066,44 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
           type="button"
           onClick={handleSpin}
           disabled={spinState !== 'idle'}
-          aria-label="Girar a roleta"
-          className={`kv-btn kv-btn-spin w-full ${spinState === 'idle' ? 'kv-btn-spin--idle' : 'kv-btn-spin--busy'}`}
+          aria-label={
+            spinState === 'idle' ? 'Girar a roleta'
+              : spinState === 'requesting' ? 'Sorteando'
+                : spinState === 'spinning' ? 'Girando'
+                  : 'Prêmio revelado'
+          }
+          className={`kv-btn kv-btn-spin ${spinState === 'idle' ? 'kv-btn-spin--idle' : 'kv-btn-spin--busy'}`}
           style={{
-            fontFamily: 'Nunito, sans-serif',
             border: 'none',
-            borderRadius: 999,
-            padding: isMobile ? '14px 24px' : '20px 32px',
-            fontSize: isMobile ? 17 : 19,
-            fontWeight: 900,
-            letterSpacing: 1,
+            borderRadius: spinBtnSize * 0.32,
+            width: spinBtnSize,
+            height: spinBtnSize,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: spinState === 'idle' ? 'pointer' : 'not-allowed',
-            textTransform: 'uppercase',
-            minHeight: isMobile ? 52 : 60,
             visibility: spinState === 'landed' ? 'hidden' : 'visible',
           }}
         >
-          {spinState === 'idle' && 'Girar a roleta'}
-          {spinState === 'requesting' && 'Sorteando…'}
-          {spinState === 'spinning' && 'Boa sorte!'}
-          {spinState === 'landed' && 'Parabéns!'}
+          {spinState === 'idle' && <RotateCw size={spinBtnSize * 0.42} strokeWidth={2.6} color={WHITE} aria-hidden="true" />}
+          {(spinState === 'requesting' || spinState === 'spinning') && (
+            <Loader2 size={spinBtnSize * 0.42} strokeWidth={2.6} color={PITAYA_800} className="animate-spin" aria-hidden="true" />
+          )}
         </button>
-        {spinState === 'idle' && (
+        {spinState !== 'landed' && (
           <p className="text-xs sm:text-base text-center" style={{ color: PURPLE, fontWeight: 600 }}>
-            {!multiChance
-              ? 'Toque em girar. Você só tem uma chance!'
-              : chancesLeft >= totalChances
-                ? <EmojiText>{`Toque em girar. São ${totalChances} chances até você levar um prêmio! 🍀`}</EmojiText>
-                : chancesLeft > 0
-                  ? <EmojiText>{`Ainda dá! ${chancesLeft === 1 ? 'Falta 1 chance' : `Faltam ${chancesLeft} chances`}. Vai que é dessa vez! 🍀`}</EmojiText>
-                  : 'Suas chances acabaram por aqui.'}
+            {spinState === 'requesting' && 'Sorteando…'}
+            {spinState === 'spinning' && <EmojiText>Boa sorte! 🍀</EmojiText>}
+            {spinState === 'idle' && (
+              !multiChance
+                ? 'Toque em girar. Você só tem uma chance!'
+                : chancesLeft >= totalChances
+                  ? <EmojiText>{`Toque em girar. São ${totalChances} chances até você levar um prêmio! 🍀`}</EmojiText>
+                  : chancesLeft > 0
+                    ? <EmojiText>{`Ainda dá! ${chancesLeft === 1 ? 'Falta 1 chance' : `Faltam ${chancesLeft} chances`}. Vai que é dessa vez! 🍀`}</EmojiText>
+                    : 'Suas chances acabaram por aqui.'
+            )}
           </p>
         )}
       </div>
@@ -1225,21 +1240,26 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
         }
         .kv-btn:disabled { cursor: not-allowed; }
 
-        /* Botão principal — Girar */
+        /* Botão principal — Girar. Squircle com gradiente sutil (topo mais
+           claro → base mais escura) + linha fina e clara só na borda de
+           cima: sugere uma superfície convexa ("isso empurra") sem sair do
+           flat design — mesma técnica de fintech/gamificação, sem o gloss
+           realista de caça-níquel. */
         .kv-btn-spin--idle {
-          background: ${PITAYA_600};
-          color: ${WHITE};
+          background: linear-gradient(180deg, ${PITAYA_500} 0%, ${PITAYA_700} 100%);
+          box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.45), 0 6px 14px rgba(148, 41, 113, 0.28);
         }
         .kv-btn-spin--idle:hover {
-          background: ${PITAYA_700};
+          background: linear-gradient(180deg, ${PITAYA_600} 0%, ${PITAYA_800} 100%);
         }
         .kv-btn-spin--idle:active {
-          background: ${PITAYA_800};
-          transform: scale(0.97);
+          background: linear-gradient(180deg, ${PITAYA_700} 0%, ${PITAYA_900} 100%);
+          box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.3), 0 3px 8px rgba(148, 41, 113, 0.28);
+          transform: scale(0.96);
         }
         .kv-btn-spin--busy {
-          background: ${PITAYA_100};
-          color: ${PITAYA_800};
+          background: linear-gradient(180deg, ${WHITE} 0%, ${PITAYA_100} 100%);
+          box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.8), 0 4px 10px rgba(148, 41, 113, 0.14);
         }
 
         /* Botão do card de prêmio — Resgatar */
