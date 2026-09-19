@@ -358,7 +358,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // Mobile-first: usa quase toda a largura da tela; em telas maiores mantém limite confortável.
-  const horizontalPadding = viewportW < 640 ? Math.round(viewportW * 0.065) : 48;
+  const horizontalPadding = viewportW < 640 ? 24 : 48;
   const sizeByWidth = Math.max(240, viewportW - horizontalPadding);
   const isMobile = viewportW < 640;
   // Botão de girar — squircle grande (não pill): a proporção quase 1:1 lê
@@ -736,7 +736,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   return (
     <div
       ref={screenRootRef}
-      className="relative flex-1 flex flex-col items-center justify-between px-3 sm:px-4 pt-2 w-full overflow-hidden"
+      className="relative flex-1 flex flex-col items-center justify-center sm:justify-between px-3 sm:px-4 pt-2 w-full overflow-hidden"
       style={{
         fontFamily: 'Nunito, sans-serif',
         background: BG_DARK,
@@ -752,7 +752,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
 
       {spinState === 'landed' && revealPrize && !revealPrize.is_consolation && <CoinRain />}
 
-      <div ref={titleBlockRef} className="text-center mt-0 mb-1 sm:mb-3 shrink-0">
+      <div ref={titleBlockRef} className="text-center mt-0 mb-[22px] sm:mb-3 shrink-0">
         <p className="text-[10px] sm:text-xs" style={{ color: PURPLE, fontWeight: 800, letterSpacing: 2, textTransform: 'uppercase' }}>
           Roleta da sorte
         </p>
@@ -1130,7 +1130,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
       {/* Spin button / status */}
       <div
         ref={bottomBlockRef}
-        className="mt-3 sm:mt-6 flex flex-col items-center gap-3 sm:gap-4 w-full max-w-sm px-2 shrink-0"
+        className="mt-2 sm:mt-6 flex flex-col items-center gap-3 sm:gap-4 w-full max-w-sm px-2 shrink-0"
         style={{ marginBottom: 'max(20px, env(safe-area-inset-bottom))' }}
       >
 
@@ -1165,7 +1165,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
           )}
         </button>
         {spinState !== 'landed' && (
-          <p className="text-xs sm:text-base text-center" style={{ color: PURPLE, fontWeight: 600 }}>
+          <p className="hidden sm:block text-xs sm:text-base text-center" style={{ color: PURPLE, fontWeight: 600 }}>
             {spinState === 'requesting' && 'Sorteando…'}
             {spinState === 'spinning' && <EmojiText>Boa sorte! 🍀</EmojiText>}
             {spinState === 'idle' && (
