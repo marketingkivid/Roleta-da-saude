@@ -358,7 +358,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // Mobile-first: usa quase toda a largura da tela; em telas maiores mantém limite confortável.
-  const horizontalPadding = viewportW < 640 ? 4 : 48;
+  const horizontalPadding = viewportW < 640 ? Math.round(viewportW * 0.065) : 48;
   const sizeByWidth = Math.max(240, viewportW - horizontalPadding);
   const isMobile = viewportW < 640;
   // Botão de girar — squircle grande (não pill): a proporção quase 1:1 lê
