@@ -8,7 +8,7 @@ interface LandingScreenProps {
 const LandingScreen = ({ onStart }: LandingScreenProps) => {
   return (
     <div
-      className="relative flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 text-center overflow-hidden w-full max-w-2xl mx-auto"
+      className="relative flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 text-center overflow-x-clip pt-6 w-full max-w-2xl mx-auto"
       style={{
         paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
         paddingLeft: 'max(16px, env(safe-area-inset-left))',

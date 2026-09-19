@@ -53,6 +53,13 @@ const BG_DARK = BG;
 // Paleta e regra de alternância vêm de src/lib/wheel-theme.ts (compartilhado
 // com as prévias do admin, para garantir fidelidade total).
 const RIM = WHEEL.rim;
+// Giro: fase livre (começa no toque, velocidade constante) + fase de
+// desaceleração (começa quando o servidor responde). A velocidade inicial da
+// curva (~2x a média) casa com FREE_SPIN_DEG_PER_S, então não há "tranco".
+const SPIN_EASE = [0.25, 0.5, 0.2, 1] as const;
+const FREE_SPIN_DEG_PER_S = 1200;
+const FREE_SPIN_RAMP_MS = 180;
+
 const RIM_EDGE = WHEEL.rimEdge;
 const RIM_BULB_MAGENTA = WHEEL.bulbMagenta;
 const POINTER = WHEEL.pointer;
@@ -116,6 +123,8 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const tooltipTimerRef = useRef<number | null>(null);
   const wheelRef = useRef<SVGSVGElement | null>(null);
+  const freeSpinRafRef = useRef<number | null>(null);
+  const freeSpinAngleRef = useRef(0);
   const wheelWrapRef = useRef<HTMLDivElement | null>(null);
   // Medidos de verdade (não chutados): quanto espaço o cabeçalho da tela
   // (título + badge) e o rodapé (botão + legenda) realmente ocupam, e
@@ -204,6 +213,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     hapticTimersRef.current = [];
   };
   useEffect(() => () => {
+    if (freeSpinRafRef.current !== null) cancelAnimationFrame(freeSpinRafRef.current);
     clearHapticTimers();
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       try { navigator.vibrate(0); } catch { /* noop */ }
@@ -252,7 +262,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     if (totalTicks <= 0) return;
 
     // Mesmo easing que a rotação visual — os ticks coincidem com os segmentos.
-    const ease = makeBezier(0.09, 0.75, 0.16, 1);
+    const ease = makeBezier(...SPIN_EASE);
     const samples = 720;
     let nextTick = 1;
     for (let i = 1; i <= samples && nextTick <= totalTicks; i++) {
@@ -348,7 +358,7 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // Mobile-first: usa quase toda a largura da tela; em telas maiores mantém limite confortável.
-  const horizontalPadding = viewportW < 400 ? 8 : viewportW < 640 ? 14 : 48;
+  const horizontalPadding = viewportW < 640 ? 4 : 48;
   const sizeByWidth = Math.max(240, viewportW - horizontalPadding);
   const isMobile = viewportW < 640;
   // Botão de girar — squircle grande (não pill): a proporção quase 1:1 lê
@@ -392,11 +402,13 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
   // espaço do ponteiro — então isso entra na conta, não só o título/rodapé.
   // +16px de folga entre os blocos por cima disso.
   const sizeByHeight = Math.max(220, chrome.container - chrome.title - chrome.bottom - 40 - 16);
-  const size = Math.min(560, sizeByWidth, sizeByHeight);
+  // Mobile: roda o maior possível (largura total). Tablet/desktop: teto menor.
+  const maxSize = isMobile ? 560 : 400;
+  const size = Math.min(maxSize, sizeByWidth, sizeByHeight);
 
   const cx = size / 2;
   const cy = size / 2;
-  const r = size / 2 - 28; // leave room for gold rim + bulbs
+  const r = size / 2 - (isMobile ? 19 : 28); // espaço p/ aro + bulbs (mobile mais justo = disco maior)
   const n = segments.length;
   const sliceAngle = n > 0 ? 360 / n : 0;
 
@@ -413,15 +425,39 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     // Toque de largada — pulso mais grave e forte + thump sonoro contundente.
     feel([25, 20, 45], { freq: 55, duration: 0.09, gain: 0.5 });
 
-    // "Impulso" — a roda já reage no instante do toque, antes de qualquer
-    // resposta do servidor chegar. Puxa alguns graus pra trás (como um
-    // pião sendo armado); quando o giro de verdade começar, a transição
-    // continua dali mesmo — sem pulo, sem reset. É o que faz o toque
-    // parecer instantâneo mesmo com uma ida à rede no meio do caminho.
-    if (!prefersReducedMotion()) setRotation(prev => prev - 16);
+    // Giro livre imediato: a roda começa a girar NO toque (rampa curta de
+    // aceleração e depois velocidade constante), sem esperar o servidor.
+    // Escreve direto no DOM (sem re-render por frame) para ficar fluido.
+    const reduced = prefersReducedMotion();
+    const startAngle = rotation;
+    freeSpinAngleRef.current = startAngle;
+    if (!reduced) {
+      const t0 = performance.now();
+      let last = t0;
+      const tick = (now: number) => {
+        const dt = Math.min(now - last, 50) / 1000;
+        last = now;
+        const speed = FREE_SPIN_DEG_PER_S * Math.min(1, (now - t0) / FREE_SPIN_RAMP_MS);
+        freeSpinAngleRef.current += speed * dt;
+        if (wheelRef.current) {
+          wheelRef.current.style.transition = 'none';
+          wheelRef.current.style.transform = `rotate(${freeSpinAngleRef.current}deg)`;
+        }
+        freeSpinRafRef.current = requestAnimationFrame(tick);
+      };
+      freeSpinRafRef.current = requestAnimationFrame(tick);
+    }
+    const stopFreeSpin = () => {
+      if (freeSpinRafRef.current !== null) {
+        cancelAnimationFrame(freeSpinRafRef.current);
+        freeSpinRafRef.current = null;
+      }
+    };
 
     const result = await onSpin();
+    stopFreeSpin();
     if (!result) {
+      setRotation(freeSpinAngleRef.current);
       setSpinState('idle');
       return;
     }
@@ -431,22 +467,20 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
     // We rotate the wheel by -segmentCenter so its center aligns under the top pointer.
     const targetIdx = result.segmentIndex;
     const segmentCenter = targetIdx * sliceAngle + sliceAngle / 2;
-    const extraTurns = prefersReducedMotion() ? 0 : 8; // full turns for drama
-    const finalRotation = extraTurns * 360 - segmentCenter;
-    const duration = prefersReducedMotion() ? 500 : 6000;
+    const extraTurns = reduced ? 0 : 9; // voltas completas (a partir de onde a roda está agora)
+    const duration = reduced ? 500 : 6000;
+    const current = freeSpinAngleRef.current;
+
+    // Fixa o React no ângulo atual (a transição parte daqui, sem pulo) e
+    // escolhe o alvo: primeiro ângulo ≡ -segmentCenter (mod 360) com pelo
+    // menos `extraTurns` voltas à frente.
+    const k = Math.ceil((current + extraTurns * 360 + segmentCenter) / 360);
+    const finalRotation = k * 360 - segmentCenter;
 
     setSpinState('spinning');
-    // Chain from current visual position: ensure monotonic increase and land exactly on segment center
     clearHapticTimers();
-    setRotation(prev => {
-      const current = ((prev % 360) + 360) % 360;
-      const base = prev - current; // last full-turn baseline
-      const next = base + finalRotation;
-      const delta = next - prev;
-      // Programa um "tick" tátil-sonoro a cada centro de segmento cruzando o ponteiro.
-      scheduleTickHaptics(delta, duration);
-      return next;
-    });
+    scheduleTickHaptics(finalRotation - current, duration);
+    setRotation(finalRotation);
 
     const landId = window.setTimeout(() => {
       setSpinState('landed');
@@ -828,10 +862,8 @@ const RouletteScreen = ({ campaignId, onSpin, onFinish, attempts }: RouletteScre
               transform: `rotate(${rotation}deg)`,
               transition:
                 spinState === 'spinning'
-                  ? `transform ${prefersReducedMotion() ? 0.5 : 6}s cubic-bezier(0.09, 0.75, 0.16, 1)`
-                  : spinState === 'requesting'
-                    ? 'transform 220ms cubic-bezier(0.34, 0, 0.64, 1)'
-                    : 'none',
+                  ? `transform ${prefersReducedMotion() ? 0.5 : 6}s cubic-bezier(${SPIN_EASE.join(', ')})`
+                  : 'none',
             }}
           >
           {/* Aro vinho — flat, sem gradiente (design final Kivid) */}
