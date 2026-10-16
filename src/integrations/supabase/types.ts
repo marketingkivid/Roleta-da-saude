@@ -292,6 +292,10 @@ export type Database = {
           redeem_instructions: string
           show_image: boolean
           weight: number
+          email_button_text: string
+          email_button_url: string
+          email_instructions: string
+          email_prize_name: string
         }
         Insert: {
           active?: boolean
@@ -312,6 +316,10 @@ export type Database = {
           redeem_instructions?: string
           show_image?: boolean
           weight?: number
+          email_button_text?: string
+          email_button_url?: string
+          email_instructions?: string
+          email_prize_name?: string
         }
         Update: {
           active?: boolean
@@ -332,6 +340,10 @@ export type Database = {
           redeem_instructions?: string
           show_image?: boolean
           weight?: number
+          email_button_text?: string
+          email_button_url?: string
+          email_instructions?: string
+          email_prize_name?: string
         }
         Relationships: [
           {

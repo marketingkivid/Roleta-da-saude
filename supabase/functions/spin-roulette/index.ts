@@ -52,13 +52,17 @@ async function sendPrizeEmailBestEffort(campaignName: string, prize: PrizeRow, t
     const settings = settingsRow as unknown as EmailSettings;
     if (!settings.sender_email) return; // Personalização ainda não configurada
 
-    const kind = prize.checkout_url ? "prize_coupon" : "prize_physical";
+    // Personalização por prêmio (vazio = padrão): nome, instruções, botão e link.
+    const buttonUrl = (prize.email_button_url || "").trim() || prize.checkout_url || undefined;
+    const kind = buttonUrl ? "prize_coupon" : "prize_physical";
     const vars = {
       nome: toName || "",
       campanha: campaignName,
-      premio: prize.name,
-      checkoutUrl: prize.checkout_url ?? undefined,
+      premio: (prize.email_prize_name || "").trim() || prize.name,
+      checkoutUrl: buttonUrl,
       premioImagem: prize.image_url || undefined,
+      instrucoes: prize.email_instructions || undefined,
+      botaoTexto: prize.email_button_text || undefined,
     };
     const subject = emailSubject(kind, settings, vars);
     const html = renderEmailHtml(kind, settings, vars, { logoUrl: LOGO_URL });
@@ -132,6 +136,10 @@ type PrizeRow = {
   image_url: string;
   checkout_url: string | null;
   redeem_instructions: string;
+  email_prize_name?: string;
+  email_instructions?: string;
+  email_button_text?: string;
+  email_button_url?: string;
   is_consolation: boolean;
   color_token: string | null;
   display_order: number;

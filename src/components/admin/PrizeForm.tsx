@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import PrizeImageUpload from './PrizeImageUpload';
 import RewardPreview from './RewardPreview';
+import PrizeEmailPreview from './PrizeEmailPreview';
 import ConsolationPreview from './ConsolationPreview';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { inputStyle, labelStyle, focusHandler, blurHandler } from '@/lib/admin-styles';
@@ -34,7 +35,13 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
     campaign_id: prize?.campaign_id ?? '',
     quantity_available: prize?.quantity_available?.toString() ?? '',
     is_consolation: (prize as any)?.is_consolation ?? false,
+    email_prize_name: prize?.email_prize_name ?? '',
+    email_instructions: prize?.email_instructions ?? '',
+    email_button_text: prize?.email_button_text ?? '',
+    email_button_url: prize?.email_button_url ?? '',
   });
+  const [previewTab, setPreviewTab] = useState<'result' | 'email'>('result');
+  const emailUrlInvalid = !!form.email_button_url.trim() && !/^https?:\/\//i.test(form.email_button_url.trim());
 
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +64,7 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Image is only required when show_image is enabled. If disabled, emoji+name suffice.
+    if (emailUrlInvalid) return;
     if (form.show_image && !form.image_url) return;
     if (!form.show_image && (!form.emoji.trim() || !form.name.trim())) return;
     setSaving(true);
@@ -73,6 +81,10 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
       campaign_id: form.campaign_id || null,
       quantity_available: form.quantity_available ? parseInt(form.quantity_available) : null,
       is_consolation: form.is_consolation,
+      email_prize_name: form.is_consolation ? '' : form.email_prize_name.trim(),
+      email_instructions: form.is_consolation ? '' : form.email_instructions.trim(),
+      email_button_text: form.is_consolation ? '' : form.email_button_text.trim(),
+      email_button_url: form.is_consolation ? '' : form.email_button_url.trim(),
     };
 
 
@@ -95,7 +107,7 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
 
   // focusHandler and blurHandler imported from admin-styles
 
-  const previewContent = form.is_consolation ? (
+  const resultPreview = form.is_consolation ? (
     <ConsolationPreview
       name={form.name}
       description={form.description}
@@ -109,6 +121,42 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
       imageUrl={form.image_url}
       checkoutUrl={form.checkout_url}
     />
+  );
+
+  const previewContent = form.is_consolation ? resultPreview : (
+    <div>
+      <div className="flex gap-1" style={{ background: '#F3EEF7', borderRadius: 50, padding: 4, marginBottom: 16 }}>
+        {([['result', 'Tela de resultado'], ['email', 'E-mail']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setPreviewTab(id)}
+            style={{
+              flex: 1, border: 'none', borderRadius: 50, padding: '8px 12px', cursor: 'pointer',
+              fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: 13,
+              background: previewTab === id ? '#FFFFFF' : 'transparent',
+              color: previewTab === id ? '#E8357A' : '#7A6E8E',
+              boxShadow: previewTab === id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {previewTab === 'result' ? resultPreview : (
+        <PrizeEmailPreview
+          draft={{
+            name: form.name,
+            email_prize_name: form.email_prize_name,
+            email_instructions: form.email_instructions,
+            email_button_text: form.email_button_text,
+            email_button_url: form.email_button_url,
+            checkout_url: form.checkout_url,
+            image_url: form.image_url,
+          }}
+        />
+      )}
+    </div>
   );
 
   return (
@@ -229,6 +277,95 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
           </div>
         )}
 
+        {!form.is_consolation && (
+          <div style={{ background: '#FAF7FC', border: '1px solid #E8E0EE', borderRadius: 16, padding: 16 }} className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>E-mail enviado ao ganhador</p>
+                <p style={{ fontSize: 12, color: '#9B8FAE', marginTop: 2 }}>
+                  Tudo opcional: o que ficar em branco usa o padrão. Use <code>{'{nome}'}</code> e <code>{'{premio}'}</code> nos textos. Veja o resultado na aba "E-mail" da prévia.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewTab('email')}
+                className="lg:hidden"
+                style={{ fontSize: 12, fontWeight: 700, color: '#E8357A', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Ver e-mail
+              </button>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Nome do prêmio no e-mail</label>
+              <input
+                value={form.email_prize_name}
+                onChange={e => update('email_prize_name', e.target.value)}
+                placeholder={form.name || 'Igual ao nome do prêmio'}
+                maxLength={200}
+                style={inputStyle} onFocus={focusHandler} onBlur={blurHandler}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Instruções de resgate no e-mail</label>
+                {form.redeem_instructions.trim() && form.email_instructions !== form.redeem_instructions && (
+                  <button
+                    type="button"
+                    onClick={() => update('email_instructions', form.redeem_instructions)}
+                    style={{ fontSize: 12, fontWeight: 700, color: '#E8357A', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Copiar da tela de resgate
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={form.email_instructions}
+                onChange={e => update('email_instructions', e.target.value)}
+                rows={4}
+                maxLength={2000}
+                placeholder="Em branco = texto padrão da aba Personalização"
+                style={{ ...inputStyle, resize: 'vertical' }}
+                onFocus={focusHandler as unknown as React.FocusEventHandler<HTMLTextAreaElement>}
+                onBlur={blurHandler as unknown as React.FocusEventHandler<HTMLTextAreaElement>}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label style={labelStyle}>Texto do botão</label>
+                <input
+                  value={form.email_button_text}
+                  onChange={e => update('email_button_text', e.target.value)}
+                  placeholder="Resgatar meu prêmio"
+                  maxLength={80}
+                  style={inputStyle} onFocus={focusHandler} onBlur={blurHandler}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Link do botão</label>
+                <input
+                  value={form.email_button_url}
+                  onChange={e => update('email_button_url', e.target.value)}
+                  placeholder={form.checkout_url || 'https://...'}
+                  inputMode="url"
+                  style={{ ...inputStyle, ...(emailUrlInvalid ? { borderColor: '#E8357A' } : {}) }} onFocus={focusHandler} onBlur={blurHandler}
+                />
+                {emailUrlInvalid ? (
+                  <p style={{ fontSize: 11, color: '#E8357A', marginTop: 4 }}>O link precisa começar com http:// ou https://</p>
+                ) : (
+                  <p style={{ fontSize: 11, color: '#9B8FAE', marginTop: 4 }}>
+                    {form.email_button_url.trim() || form.checkout_url.trim()
+                      ? 'Em branco = usa a URL de checkout do prêmio.'
+                      : 'Sem link (nem URL de checkout), o e-mail sai sem botão.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
             <label style={labelStyle}>Campanha (opcional)</label>
@@ -286,7 +423,7 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
         <div className="flex gap-3 pt-2 items-center">
           <button
             type="submit"
-            disabled={saving || (form.show_image && !form.image_url) || (!form.show_image && (!form.emoji.trim() || !form.name.trim()))}
+            disabled={saving || emailUrlInvalid || (form.show_image && !form.image_url) || (!form.show_image && (!form.emoji.trim() || !form.name.trim()))}
             className="transition-all hover:opacity-90 active:scale-[0.98]"
             style={{
               background: (form.show_image && !form.image_url) || (!form.show_image && (!form.emoji.trim() || !form.name.trim())) ? '#C5BDD0' : '#E8357A',

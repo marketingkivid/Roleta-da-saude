@@ -15,7 +15,21 @@ const supabase = createClient(
 const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://roleta-kivid.pages.dev").replace(/\/+$/, "");
 const LOGO_URL = `${SITE_URL}/kivid-logo.svg`;
 
-const BodySchema = z.object({ kind: z.enum(["prize_coupon", "prize_physical", "invite"]) });
+const BodySchema = z.object({
+  kind: z.enum(["prize_coupon", "prize_physical", "invite"]).optional(),
+  // Rascunho de um prêmio (formulário aberto no admin) — a prévia reflete o
+  // que está na tela, mesmo sem salvar. Os textos de Personalização continuam
+  // sendo os salvos.
+  prize: z.object({
+    name: z.string().max(200).default(""),
+    email_prize_name: z.string().max(200).default(""),
+    email_instructions: z.string().max(2000).default(""),
+    email_button_text: z.string().max(80).default(""),
+    email_button_url: z.string().max(2000).default(""),
+    checkout_url: z.string().max(2000).default(""),
+    image_url: z.string().max(2000).default(""),
+  }).optional(),
+}).refine(b => b.kind || b.prize, { message: "kind_or_prize_required" });
 
 const SAMPLE_VARS = {
   nome: "Igor",
@@ -43,7 +57,9 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const kind = parsed.data.kind as EmailKind;
+    const draft = parsed.data.prize;
+    const draftButtonUrl = draft ? (draft.email_button_url.trim() || draft.checkout_url.trim()) : "";
+    const kind: EmailKind = draft ? (draftButtonUrl ? "prize_coupon" : "prize_physical") : (parsed.data.kind as EmailKind);
 
     const { data: settingsRow } = await supabase.from("email_settings").select("*").eq("id", true).maybeSingle();
     if (!settingsRow) {
@@ -53,8 +69,18 @@ Deno.serve(async (req) => {
     }
     const settings = settingsRow as unknown as EmailSettings;
 
-    const subject = emailSubject(kind, settings, SAMPLE_VARS);
-    const html = renderEmailHtml(kind, settings, SAMPLE_VARS, { logoUrl: LOGO_URL });
+    const vars = draft
+      ? {
+          ...SAMPLE_VARS,
+          premio: draft.email_prize_name.trim() || draft.name.trim() || SAMPLE_VARS.premio,
+          checkoutUrl: draftButtonUrl ? "#" : undefined,
+          premioImagem: draft.image_url || "",
+          instrucoes: draft.email_instructions || undefined,
+          botaoTexto: draft.email_button_text || undefined,
+        }
+      : SAMPLE_VARS;
+    const subject = emailSubject(kind, settings, vars);
+    const html = renderEmailHtml(kind, settings, vars, { logoUrl: LOGO_URL });
 
     return new Response(JSON.stringify({ subject, html }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },

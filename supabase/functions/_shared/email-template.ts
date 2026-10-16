@@ -37,6 +37,10 @@ export interface EmailVars {
   checkoutUrl?: string;
   inviteUrl?: string;
   premioImagem?: string;
+  /** Instruções de resgate deste prêmio (substitui o texto padrão de Personalização). */
+  instrucoes?: string;
+  /** Texto do botão deste prêmio (padrão: "Resgatar meu prêmio"). */
+  botaoTexto?: string;
 }
 
 function fill(text: string, vars: EmailVars): string {
@@ -52,6 +56,10 @@ function esc(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function multiline(escaped: string): string {
+  return escaped.replace(/\r?\n/g, "<br/>");
 }
 
 function shell(opts: {
@@ -121,12 +129,15 @@ export function renderEmailHtml(
   // prize_coupon | prize_physical
   const title = fill(settings.prize_title, vars);
   const subtitle = vars.premio ? `Você ganhou: ${vars.premio}` : `Campanha ${vars.campanha}`;
-  const contactTitle = fill(settings.contact_block_title, vars);
-  const contactText = fill(settings.contact_block_text, vars);
+  const customInstructions = (vars.instrucoes || "").trim();
+  const contactTitle = customInstructions ? "" : fill(settings.contact_block_title, vars);
+  const contactText = fill(customInstructions || settings.contact_block_text, vars);
   const bodyHtml = contactTitle
-    ? `<strong style="color:#1A1A2E;">${esc(contactTitle)}</strong><br/>${esc(contactText)}`
-    : esc(contactText);
-  const buttonHtml = kind === "prize_coupon" && vars.checkoutUrl ? BTN(vars.checkoutUrl, "Resgatar meu prêmio") : "";
+    ? `<strong style="color:#1A1A2E;">${esc(contactTitle)}</strong><br/>${multiline(esc(contactText))}`
+    : multiline(esc(contactText));
+  const buttonHtml = kind === "prize_coupon" && vars.checkoutUrl
+    ? BTN(vars.checkoutUrl, (vars.botaoTexto || "").trim() || "Resgatar meu prêmio")
+    : "";
   const smallLineHtml = settings.whatsapp_oficial
     ? `<tr><td align="center" style="padding:14px 32px 0;"><p style="margin:0;font-size:12px;color:#9B8FAE;">WhatsApp oficial: <strong>${esc(settings.whatsapp_oficial)}</strong></p></td></tr>`
     : "";
