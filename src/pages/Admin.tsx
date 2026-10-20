@@ -12,7 +12,7 @@ const AdminDashboard = lazy(() => import('@/components/admin/AdminDashboard'));
 const CampaignList = lazy(() => import('@/components/admin/CampaignList'));
 const CampaignModal = lazy(() => import('@/components/admin/CampaignModal'));
 const ChangePasswordModal = lazy(() => import('@/components/admin/ChangePasswordModal'));
-const EmailSettings = lazy(() => import('@/components/admin/EmailSettings'));
+const EmailCenter = lazy(() => import('@/components/admin/EmailCenter'));
 
 type AdminTab = 'dashboard' | 'campaigns' | 'personalizacao';
 
@@ -271,7 +271,7 @@ const Admin = () => {
           <Suspense fallback={<TabFallback />}>
             {activeTab === 'dashboard' && <AdminDashboard />}
             {activeTab === 'campaigns' && <CampaignList key={campaignListKey} onEdit={openEdit} onDuplicate={handleDuplicate} />}
-            {activeTab === 'personalizacao' && <EmailSettings />}
+            {activeTab === 'personalizacao' && <EmailCenter />}
           </Suspense>
         </main>
       </div>

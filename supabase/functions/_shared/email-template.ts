@@ -25,9 +25,15 @@ export interface EmailSettings {
   invite_title: string;
   invite_body: string;
   invite_button_text: string;
+  consolation_enabled?: boolean;
+  consolation_subject?: string;
+  consolation_title?: string;
+  consolation_body?: string;
+  consolation_button_text?: string;
+  consolation_button_url?: string;
 }
 
-export type EmailKind = "prize_coupon" | "prize_physical" | "invite";
+export type EmailKind = "prize_coupon" | "prize_physical" | "invite" | "consolation";
 
 export interface EmailVars {
   nome: string;
@@ -41,6 +47,10 @@ export interface EmailVars {
   instrucoes?: string;
   /** Texto do botão deste prêmio (padrão: "Resgatar meu prêmio"). */
   botaoTexto?: string;
+  /** Overrides por prêmio (vazio = padrão de Personalização). */
+  assunto?: string;
+  titulo?: string;
+  tituloBloco?: string;
 }
 
 function fill(text: string, vars: EmailVars): string {
@@ -104,7 +114,11 @@ const BTN = (href: string, label: string) => `<tr><td align="center" style="padd
   </td></tr>`;
 
 export function emailSubject(kind: EmailKind, settings: EmailSettings, vars: EmailVars): string {
-  const raw = kind === "invite" ? settings.invite_subject : settings.prize_subject;
+  const raw = kind === "invite"
+    ? settings.invite_subject
+    : kind === "consolation"
+      ? (settings.consolation_subject || "")
+      : (vars.assunto || "").trim() || settings.prize_subject;
   return fill(raw, vars);
 }
 
@@ -126,11 +140,21 @@ export function renderEmailHtml(
     return shell({ logoUrl: opts.logoUrl, emoji: "🎉", title, subtitle, imageBlock: "", bodyHtml, buttonHtml, smallLineHtml, footerHtml });
   }
 
+  if (kind === "consolation") {
+    const title = fill(settings.consolation_title || "", vars);
+    const bodyHtml = multiline(esc(fill(settings.consolation_body || "", vars)));
+    const url = (settings.consolation_button_url || "").trim();
+    const buttonHtml = url ? BTN(url, (settings.consolation_button_text || "").trim() || "Saiba mais") : "";
+    const footerHtml = `Você recebeu este e-mail por participar da campanha <strong>${esc(vars.campanha)}</strong>.`;
+    return shell({ logoUrl: opts.logoUrl, emoji: "🍀", title, subtitle: `Campanha ${vars.campanha}`, imageBlock: "", bodyHtml, buttonHtml, smallLineHtml: "", footerHtml });
+  }
+
   // prize_coupon | prize_physical
-  const title = fill(settings.prize_title, vars);
+  const title = fill((vars.titulo || "").trim() || settings.prize_title, vars);
   const subtitle = vars.premio ? `Você ganhou: ${vars.premio}` : `Campanha ${vars.campanha}`;
   const customInstructions = (vars.instrucoes || "").trim();
-  const contactTitle = customInstructions ? "" : fill(settings.contact_block_title, vars);
+  const customBlockTitle = (vars.tituloBloco || "").trim();
+  const contactTitle = fill(customBlockTitle || (customInstructions ? "" : settings.contact_block_title), vars);
   const contactText = fill(customInstructions || settings.contact_block_text, vars);
   const bodyHtml = contactTitle
     ? `<strong style="color:#1A1A2E;">${esc(contactTitle)}</strong><br/>${multiline(esc(contactText))}`

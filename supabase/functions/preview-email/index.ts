@@ -16,7 +16,7 @@ const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://roleta-kivid.pages
 const LOGO_URL = `${SITE_URL}/kivid-logo.svg`;
 
 const BodySchema = z.object({
-  kind: z.enum(["prize_coupon", "prize_physical", "invite"]).optional(),
+  kind: z.enum(["prize_coupon", "prize_physical", "invite", "consolation"]).optional(),
   // Rascunho de um prêmio (formulário aberto no admin) — a prévia reflete o
   // que está na tela, mesmo sem salvar. Os textos de Personalização continuam
   // sendo os salvos.
@@ -26,9 +26,15 @@ const BodySchema = z.object({
     email_instructions: z.string().max(2000).default(""),
     email_button_text: z.string().max(80).default(""),
     email_button_url: z.string().max(2000).default(""),
+    email_subject: z.string().max(300).default(""),
+    email_title: z.string().max(300).default(""),
+    email_block_title: z.string().max(300).default(""),
     checkout_url: z.string().max(2000).default(""),
     image_url: z.string().max(2000).default(""),
   }).optional(),
+  // Rascunho de textos de Personalização (ex.: e-mail "Não foi dessa vez" sendo
+  // editado) — mesclado por cima do que está salvo, só para a prévia.
+  settings_override: z.record(z.string(), z.union([z.string().max(4000), z.boolean()])).optional(),
 }).refine(b => b.kind || b.prize, { message: "kind_or_prize_required" });
 
 const SAMPLE_VARS = {
@@ -67,7 +73,7 @@ Deno.serve(async (req) => {
         status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const settings = settingsRow as unknown as EmailSettings;
+    const settings = { ...(settingsRow as unknown as EmailSettings), ...(parsed.data.settings_override ?? {}) } as EmailSettings;
 
     const vars = draft
       ? {
@@ -77,6 +83,9 @@ Deno.serve(async (req) => {
           premioImagem: draft.image_url || "",
           instrucoes: draft.email_instructions || undefined,
           botaoTexto: draft.email_button_text || undefined,
+          assunto: draft.email_subject || undefined,
+          titulo: draft.email_title || undefined,
+          tituloBloco: draft.email_block_title || undefined,
         }
       : SAMPLE_VARS;
     const subject = emailSubject(kind, settings, vars);

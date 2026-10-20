@@ -296,6 +296,9 @@ export type Database = {
           email_button_url: string
           email_instructions: string
           email_prize_name: string
+          email_subject: string
+          email_title: string
+          email_block_title: string
         }
         Insert: {
           active?: boolean
@@ -320,6 +323,9 @@ export type Database = {
           email_button_url?: string
           email_instructions?: string
           email_prize_name?: string
+          email_subject?: string
+          email_title?: string
+          email_block_title?: string
         }
         Update: {
           active?: boolean
@@ -344,6 +350,9 @@ export type Database = {
           email_button_url?: string
           email_instructions?: string
           email_prize_name?: string
+          email_subject?: string
+          email_title?: string
+          email_block_title?: string
         }
         Relationships: [
           {

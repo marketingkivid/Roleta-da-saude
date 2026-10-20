@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, X, Loader2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { FONT, CARD, inputStyle, labelStyle, helperStyle, focusHandler, blurHandler } from '@/lib/admin-styles';
 
 // `email_settings` é uma tabela nova (Personalização) ainda não coberta pelo
@@ -80,7 +80,7 @@ const EmailSettings = () => {
 
   const save = async () => {
     setSaving(true);
-    const { id: _omit, ...payload } = form as EmailSettingsRow & { id?: unknown };
+    const payload = Object.fromEntries(FIELDS.map(f => [f.key, form[f.key]]));
     const { error } = await table().update(payload).eq('id', true);
     setSaving(false);
     if (error) { toast.error('Erro ao salvar. Tente novamente.'); return; }
@@ -115,14 +115,11 @@ const EmailSettings = () => {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <div className="flex items-center gap-2 mb-1">
-        <Mail size={20} style={{ color: '#E8357A' }} />
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1A1A2E', ...FONT }}>Personalização do e-mail de prêmio</h2>
-      </div>
       <p style={{ ...helperStyle, marginBottom: 20, fontSize: 13 }}>
-        Chaves disponíveis nos textos: <code style={{ background: '#F5F3F7', borderRadius: 4, padding: '1px 6px' }}>{'{nome}'}</code>,{' '}
+        Textos padrão e remetente, valem para todos os e-mails. Chaves disponíveis nos textos: <code style={{ background: '#F5F3F7', borderRadius: 4, padding: '1px 6px' }}>{'{nome}'}</code>,{' '}
         <code style={{ background: '#F5F3F7', borderRadius: 4, padding: '1px 6px' }}>{'{premio}'}</code> e{' '}
         <code style={{ background: '#F5F3F7', borderRadius: 4, padding: '1px 6px' }}>{'{campanha}'}</code> — são trocadas pelos dados reais na hora do envio.
+        Cada prêmio pode ter e-mail próprio na aba "Por prêmio".
       </p>
 
       <div style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: 16 }}>

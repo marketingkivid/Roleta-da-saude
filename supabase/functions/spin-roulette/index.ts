@@ -63,6 +63,9 @@ async function sendPrizeEmailBestEffort(campaignName: string, prize: PrizeRow, t
       premioImagem: prize.image_url || undefined,
       instrucoes: prize.email_instructions || undefined,
       botaoTexto: prize.email_button_text || undefined,
+      assunto: prize.email_subject || undefined,
+      titulo: prize.email_title || undefined,
+      tituloBloco: prize.email_block_title || undefined,
     };
     const subject = emailSubject(kind, settings, vars);
     const html = renderEmailHtml(kind, settings, vars, { logoUrl: LOGO_URL });
@@ -82,6 +85,31 @@ async function sendPrizeEmailBestEffort(campaignName: string, prize: PrizeRow, t
     }
   } catch (e) {
     console.error("[spin-roulette] prize email fatal", e);
+  }
+}
+
+/**
+ * "Não foi dessa vez": e-mail fixo enviado quando a participação termina sem
+ * prêmio (acabaram as chances). Best-effort e só se o admin ligou em
+ * Personalização — nunca derruba o giro.
+ */
+async function sendConsolationEmailBestEffort(campaignName: string, toEmail: string, toName: string) {
+  try {
+    if (!toEmail) return;
+    const { data: settingsRow } = await supabase.from("email_settings").select("*").eq("id", true).maybeSingle();
+    if (!settingsRow) return;
+    const settings = settingsRow as unknown as EmailSettings;
+    if (!settings.sender_email || !settings.consolation_enabled) return;
+    const vars = { nome: toName || "", campanha: campaignName };
+    const result = await sendTransactionalEmail({
+      to: { email: toEmail, name: toName || undefined },
+      sender: { name: settings.sender_name || "Kivid", email: settings.sender_email },
+      subject: emailSubject("consolation", settings, vars),
+      html: renderEmailHtml("consolation", settings, vars, { logoUrl: LOGO_URL }),
+    });
+    if (!result.ok) console.error("[spin-roulette] consolation email failed", { status: result.status, body: result.body });
+  } catch (e) {
+    console.error("[spin-roulette] consolation email fatal", e);
   }
 }
 
@@ -140,6 +168,9 @@ type PrizeRow = {
   email_instructions?: string;
   email_button_text?: string;
   email_button_url?: string;
+  email_subject?: string;
+  email_title?: string;
+  email_block_title?: string;
   is_consolation: boolean;
   color_token: string | null;
   display_order: number;
@@ -478,6 +509,12 @@ Deno.serve(async (req) => {
     // experiência (é best-effort dentro de sendPrizeEmailBestEffort).
     if (won && !isTest && email) {
       runInBackground(sendPrizeEmailBestEffort(campaign.name, winner, email, name));
+    }
+
+    // Terminou sem prêmio → e-mail fixo de "não foi dessa vez" (uma vez só,
+    // no fim da participação — não a cada giro de consolação).
+    if (!won && finished && !isTest && email) {
+      runInBackground(sendConsolationEmailBestEffort(campaign.name, email, name));
     }
 
     return spinResponse(winner, segments, { attempt, maxAttempts, attemptsLeft, finished, won }, corsHeaders);

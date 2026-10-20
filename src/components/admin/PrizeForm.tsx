@@ -4,6 +4,8 @@ import type { Tables } from '@/integrations/supabase/types';
 import PrizeImageUpload from './PrizeImageUpload';
 import RewardPreview from './RewardPreview';
 import PrizeEmailPreview from './PrizeEmailPreview';
+import PrizeEmailFields from './PrizeEmailFields';
+import { pickPrizeEmail, isValidEmailUrl, PRIZE_EMAIL_KEYS, type PrizeEmailValues, type PrizeEmailDefaults } from '@/lib/prize-email';
 import ConsolationPreview from './ConsolationPreview';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { inputStyle, labelStyle, focusHandler, blurHandler } from '@/lib/admin-styles';
@@ -35,17 +37,19 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
     campaign_id: prize?.campaign_id ?? '',
     quantity_available: prize?.quantity_available?.toString() ?? '',
     is_consolation: (prize as any)?.is_consolation ?? false,
-    email_prize_name: prize?.email_prize_name ?? '',
-    email_instructions: prize?.email_instructions ?? '',
-    email_button_text: prize?.email_button_text ?? '',
-    email_button_url: prize?.email_button_url ?? '',
+    ...pickPrizeEmail(prize),
   });
+  const [emailDefaults, setEmailDefaults] = useState<PrizeEmailDefaults>({});
   const [previewTab, setPreviewTab] = useState<'result' | 'email'>('result');
-  const emailUrlInvalid = !!form.email_button_url.trim() && !/^https?:\/\//i.test(form.email_button_url.trim());
+  const emailUrlInvalid = !isValidEmailUrl(form.email_button_url);
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // Textos padrão de Personalização — viram placeholders dos campos de e-mail.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('email_settings').select('prize_subject, prize_title, contact_block_title, contact_block_text').eq('id', true).maybeSingle()
+      .then(({ data }: { data: PrizeEmailDefaults | null }) => { if (data) setEmailDefaults(data); });
     supabase.from('campaigns').select('id, name').order('created_at', { ascending: false }).then(({ data }) => {
       if (data) setCampaigns(data);
     });
@@ -81,10 +85,7 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
       campaign_id: form.campaign_id || null,
       quantity_available: form.quantity_available ? parseInt(form.quantity_available) : null,
       is_consolation: form.is_consolation,
-      email_prize_name: form.is_consolation ? '' : form.email_prize_name.trim(),
-      email_instructions: form.is_consolation ? '' : form.email_instructions.trim(),
-      email_button_text: form.is_consolation ? '' : form.email_button_text.trim(),
-      email_button_url: form.is_consolation ? '' : form.email_button_url.trim(),
+      ...Object.fromEntries(PRIZE_EMAIL_KEYS.map(k => [k, form.is_consolation ? '' : form[k].trim()])),
     };
 
 
@@ -145,14 +146,13 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
       </div>
       {previewTab === 'result' ? resultPreview : (
         <PrizeEmailPreview
-          draft={{
-            name: form.name,
-            email_prize_name: form.email_prize_name,
-            email_instructions: form.email_instructions,
-            email_button_text: form.email_button_text,
-            email_button_url: form.email_button_url,
-            checkout_url: form.checkout_url,
-            image_url: form.image_url,
+          request={{
+            prize: {
+              name: form.name,
+              ...Object.fromEntries(PRIZE_EMAIL_KEYS.map(k => [k, form[k]])),
+              checkout_url: form.checkout_url,
+              image_url: form.image_url,
+            },
           }}
         />
       )}
@@ -283,86 +283,22 @@ const PrizeForm = ({ prize, onSave, onCancel }: PrizeFormProps) => {
               <div>
                 <p style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>E-mail enviado ao ganhador</p>
                 <p style={{ fontSize: 12, color: '#9B8FAE', marginTop: 2 }}>
-                  Tudo opcional: o que ficar em branco usa o padrão. Use <code>{'{nome}'}</code> e <code>{'{premio}'}</code> nos textos. Veja o resultado na aba "E-mail" da prévia.
+                  Tudo opcional: o que ficar em branco usa o padrão da aba Personalização. Veja o resultado na aba "E-mail" da prévia.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setPreviewTab('email')}
-                className="lg:hidden"
-                style={{ fontSize: 12, fontWeight: 700, color: '#E8357A', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
+              <button type="button" onClick={() => setPreviewTab('email')} className="lg:hidden"
+                style={{ fontSize: 12, fontWeight: 700, color: '#E8357A', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 Ver e-mail
               </button>
             </div>
-
-            <div>
-              <label style={labelStyle}>Nome do prêmio no e-mail</label>
-              <input
-                value={form.email_prize_name}
-                onChange={e => update('email_prize_name', e.target.value)}
-                placeholder={form.name || 'Igual ao nome do prêmio'}
-                maxLength={200}
-                style={inputStyle} onFocus={focusHandler} onBlur={blurHandler}
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Instruções de resgate no e-mail</label>
-                {form.redeem_instructions.trim() && form.email_instructions !== form.redeem_instructions && (
-                  <button
-                    type="button"
-                    onClick={() => update('email_instructions', form.redeem_instructions)}
-                    style={{ fontSize: 12, fontWeight: 700, color: '#E8357A', background: 'none', border: 'none', cursor: 'pointer' }}
-                  >
-                    Copiar da tela de resgate
-                  </button>
-                )}
-              </div>
-              <textarea
-                value={form.email_instructions}
-                onChange={e => update('email_instructions', e.target.value)}
-                rows={4}
-                maxLength={2000}
-                placeholder="Em branco = texto padrão da aba Personalização"
-                style={{ ...inputStyle, resize: 'vertical' }}
-                onFocus={focusHandler as unknown as React.FocusEventHandler<HTMLTextAreaElement>}
-                onBlur={blurHandler as unknown as React.FocusEventHandler<HTMLTextAreaElement>}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label style={labelStyle}>Texto do botão</label>
-                <input
-                  value={form.email_button_text}
-                  onChange={e => update('email_button_text', e.target.value)}
-                  placeholder="Resgatar meu prêmio"
-                  maxLength={80}
-                  style={inputStyle} onFocus={focusHandler} onBlur={blurHandler}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Link do botão</label>
-                <input
-                  value={form.email_button_url}
-                  onChange={e => update('email_button_url', e.target.value)}
-                  placeholder={form.checkout_url || 'https://...'}
-                  inputMode="url"
-                  style={{ ...inputStyle, ...(emailUrlInvalid ? { borderColor: '#E8357A' } : {}) }} onFocus={focusHandler} onBlur={blurHandler}
-                />
-                {emailUrlInvalid ? (
-                  <p style={{ fontSize: 11, color: '#E8357A', marginTop: 4 }}>O link precisa começar com http:// ou https://</p>
-                ) : (
-                  <p style={{ fontSize: 11, color: '#9B8FAE', marginTop: 4 }}>
-                    {form.email_button_url.trim() || form.checkout_url.trim()
-                      ? 'Em branco = usa a URL de checkout do prêmio.'
-                      : 'Sem link (nem URL de checkout), o e-mail sai sem botão.'}
-                  </p>
-                )}
-              </div>
-            </div>
+            <PrizeEmailFields
+              values={pickPrizeEmail(form as Partial<PrizeEmailValues>)}
+              onChange={(k, v) => update(k, v)}
+              prizeName={form.name}
+              checkoutUrl={form.checkout_url}
+              redeemInstructions={form.redeem_instructions}
+              defaults={emailDefaults}
+            />
           </div>
         )}
 
